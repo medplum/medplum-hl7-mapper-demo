@@ -1,0 +1,53 @@
+.App {
+  text-align: center;
+}
+
+.App-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 1.5vmin);
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fields,
+.characters {
+  display: block;
+  max-width: 50%;
+}
+
+.characters,
+.fields > ul {
+  list-style: none;
+  padding-left: 0;
+  display: block;
+  max-width: 40%;
+}
+
+.characters > ul li {
+  display: flex;
+  align-items: center;
+  border: solid 2px #d0d0d0;
+  border-radius: 0.2em;
+  padding: 0.5em 0.8em 0.5em 0.5em;
+  margin-bottom: 1em;
+}
+
+.characters > ul p {
+  max-width: none;
+  font-weight: bold;
+  margin: 0;
+}
