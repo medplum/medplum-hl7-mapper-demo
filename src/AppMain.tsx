@@ -164,14 +164,19 @@ function getHL7Value(message: Hl7Message, path: string): string {
 
 type OperatorType = 'AND' | 'OR';
 type FilterCommandType = 'startsWith' | 'contains' | 'endsWith' | 'exact';
-type TransformType = 'replace';
+type TransformType = 'replace' | 'passthrough';
 
-interface TransformRow {
+interface Transform {
+  id: string;
+  command: TransformType;
+  args: string;
+}
+
+interface Mapping {
   id: string;
   src: string;
   dst: string;
-  command: TransformType;
-  args: string;
+  transforms: Transform[];
 }
 
 interface FilterRow {
@@ -179,35 +184,40 @@ interface FilterRow {
   operator: OperatorType;
   command: FilterCommandType;
   value: string;
-  transforms: TransformRow[];
 }
 
 interface Filter {
   id: string;
   src: string;
   filterRows: FilterRow[];
+  mappings: Mapping[];
 }
 
-const INITIAL_TRANSFORM_ROW: TransformRow = {
+const INITIAL_TRANSFORM: Transform = {
+  id: '1',
+  command: 'replace',
+  args: ''
+};
+
+const INITIAL_MAPPING: Mapping = {
   id: '1',
   src: '',
   dst: '',
-  command: 'replace',
-  args: ''
+  transforms: [INITIAL_TRANSFORM]
 };
 
 const INITIAL_FILTER_ROW: FilterRow = {
   id: '1',
   operator: 'AND',
   command: 'contains',
-  value: '',
-  transforms: [INITIAL_TRANSFORM_ROW]
+  value: ''
 };
 
 const INITIAL_FILTER: Filter = {
   id: '1',
   src: '',
-  filterRows: [INITIAL_FILTER_ROW]
+  filterRows: [INITIAL_FILTER_ROW],
+  mappings: [INITIAL_MAPPING]
 };
 
 const OPERATOR_OPTIONS = [
@@ -223,7 +233,8 @@ const FILTER_COMMAND_OPTIONS = [
 ];
 
 const TRANSFORM_COMMAND_OPTIONS = [
-  { value: 'replace', label: 'Replace' }
+  { value: 'replace', label: 'Replace' },
+  { value: 'passthrough', label: 'Passthrough' }
   // Add more commands as needed
 ];
 
@@ -351,23 +362,61 @@ export function AppMain() {
         );
     };
 
-    const addTransform = (filterId: string, filterRowId: string) => {
+    const addMapping = (filterId: string) => {
         setFilters(current =>
             current.map(filter => {
                 if (filter.id === filterId) {
                     return {
                         ...filter,
-                        filterRows: filter.filterRows.map(row => {
-                            if (row.id === filterRowId) {
+                        mappings: [...filter.mappings, {
+                            ...INITIAL_MAPPING,
+                            id: (filter.mappings.length + 1).toString()
+                        }]
+                    };
+                }
+                return filter;
+            })
+        );
+    };
+
+    const updateMapping = (
+        filterId: string, 
+        mappingId: string, 
+        field: keyof Mapping, 
+        value: string
+    ) => {
+        setFilters(current =>
+            current.map(filter => {
+                if (filter.id === filterId) {
+                    return {
+                        ...filter,
+                        mappings: filter.mappings.map(mapping =>
+                            mapping.id === mappingId ? { ...mapping, [field]: value } : mapping
+                        )
+                    };
+                }
+                return filter;
+            })
+        );
+    };
+
+    const addTransform = (filterId: string, mappingId: string) => {
+        setFilters(current =>
+            current.map(filter => {
+                if (filter.id === filterId) {
+                    return {
+                        ...filter,
+                        mappings: filter.mappings.map(mapping => {
+                            if (mapping.id === mappingId) {
                                 return {
-                                    ...row,
-                                    transforms: [...row.transforms, {
-                                        ...INITIAL_TRANSFORM_ROW,
-                                        id: (row.transforms.length + 1).toString()
+                                    ...mapping,
+                                    transforms: [...mapping.transforms, {
+                                        ...INITIAL_TRANSFORM,
+                                        id: (mapping.transforms.length + 1).toString()
                                     }]
                                 };
                             }
-                            return row;
+                            return mapping;
                         })
                     };
                 }
@@ -376,22 +425,28 @@ export function AppMain() {
         );
     };
 
-    const updateTransform = (filterId: string, filterRowId: string, transformId: string, field: keyof TransformRow, value: string) => {
+    const updateTransform = (
+        filterId: string, 
+        mappingId: string,
+        transformId: string, 
+        field: keyof Transform, 
+        value: string
+    ) => {
         setFilters(current =>
             current.map(filter => {
                 if (filter.id === filterId) {
                     return {
                         ...filter,
-                        filterRows: filter.filterRows.map(row => {
-                            if (row.id === filterRowId) {
+                        mappings: filter.mappings.map(mapping => {
+                            if (mapping.id === mappingId) {
                                 return {
-                                    ...row,
-                                    transforms: row.transforms.map(transform =>
+                                    ...mapping,
+                                    transforms: mapping.transforms.map(transform =>
                                         transform.id === transformId ? { ...transform, [field]: value } : transform
                                     )
                                 };
                             }
-                            return row;
+                            return mapping;
                         })
                     };
                 }
@@ -400,20 +455,34 @@ export function AppMain() {
         );
     };
 
-    const deleteTransform = (filterId: string, filterRowId: string, transformId: string) => {
+    const deleteMapping = (filterId: string, mappingId: string) => {
         setFilters(current =>
             current.map(filter => {
                 if (filter.id === filterId) {
                     return {
                         ...filter,
-                        filterRows: filter.filterRows.map(row => {
-                            if (row.id === filterRowId) {
+                        mappings: filter.mappings.filter(m => m.id !== mappingId)
+                    };
+                }
+                return filter;
+            })
+        );
+    };
+
+    const deleteTransform = (filterId: string, mappingId: string, transformId: string) => {
+        setFilters(current =>
+            current.map(filter => {
+                if (filter.id === filterId) {
+                    return {
+                        ...filter,
+                        mappings: filter.mappings.map(mapping => {
+                            if (mapping.id === mappingId) {
                                 return {
-                                    ...row,
-                                    transforms: row.transforms.filter(t => t.id !== transformId)
+                                    ...mapping,
+                                    transforms: mapping.transforms.filter(t => t.id !== transformId)
                                 };
                             }
-                            return row;
+                            return mapping;
                         })
                     };
                 }
@@ -425,11 +494,11 @@ export function AppMain() {
     const transform = useCallback(() => {
         let message = Hl7Message.parse(input);
         
-        // Apply filters and their associated transforms
         for (const filter of filters) {
             const srcValue = getHL7Value(message, filter.src);
             
-            for (const filterRow of filter.filterRows) {
+            // Evaluate all filter conditions together with their operators
+            const filterMatches = (filterRow: FilterRow) => {
                 const matches = (() => {
                     switch (filterRow.command) {
                         case 'startsWith':
@@ -444,23 +513,41 @@ export function AppMain() {
                             return false;
                     }
                 })();
+                return { matches, operator: filterRow.operator };
+            };
 
-                // If filter matches, apply its transforms
-                if (matches) {
-                    for (const transform of filterRow.transforms) {
-                        const transformSrcValue = getHL7Value(message, transform.src);
-                        const args = transform.args.split(' ');
-                        
+            // Combine all conditions using their operators
+            const filterResult = filter.filterRows.reduce((acc, filterRow, index) => {
+                const { matches, operator } = filterMatches(filterRow);
+                
+                if (index === 0) return matches;
+                return operator === 'AND' ? (acc && matches) : (acc || matches);
+            }, false);
+
+            // If filter conditions match, apply all mappings
+            if (filterResult) {
+                for (const mapping of filter.mappings) {
+                    let currentValue = getHL7Value(message, mapping.src);
+                    
+                    // Apply each transform in sequence
+                    for (const transform of mapping.transforms) {
                         switch (transform.command) {
-                            case 'replace':
-                                message = Hl7Message.parse(setHL7ValueInString(
-                                    message.toString(), 
-                                    transform.dst, 
-                                    transformSrcValue.replace(args[0], args[1])
-                                ));
+                            case 'replace': {
+                                const args = transform.args.split(' ');
+                                currentValue = currentValue.replace(args[0], args[1]);
+                                break;
+                            }
+                            case 'passthrough':
                                 break;
                         }
                     }
+
+                    // Set final transformed value to destination
+                    message = Hl7Message.parse(setHL7ValueInString(
+                        message.toString(), 
+                        mapping.dst, 
+                        currentValue
+                    ));
                 }
             }
         }
@@ -561,81 +648,6 @@ export function AppMain() {
                                                 </ActionIcon>
                                             </Table.Td>
                                         </Table.Tr>
-                                        <Table.Tr>
-                                            <Table.Td colSpan={4}>
-                                                <Stack gap="xs" pl="xl">
-                                                    <InputLabel size="sm">Transformations</InputLabel>
-                                                    <Table>
-                                                        <Table.Thead>
-                                                            <Table.Tr>
-                                                                <Table.Th>Source</Table.Th>
-                                                                <Table.Th>Destination</Table.Th>
-                                                                <Table.Th>Command</Table.Th>
-                                                                <Table.Th>Arguments</Table.Th>
-                                                                <Table.Th>Actions</Table.Th>
-                                                            </Table.Tr>
-                                                        </Table.Thead>
-                                                        <Table.Tbody>
-                                                            {filterRow.transforms.map((transformRow) => (
-                                                                <Table.Tr key={transformRow.id}>
-                                                                    <Table.Td>
-                                                                        <Select
-                                                                            value={transformRow.src}
-                                                                            onChange={(value) => updateTransform(filter.id, filterRow.id, transformRow.id, 'src', value || '')}
-                                                                            data={HL7_SELECT_DATA}
-                                                                            searchable
-                                                                            clearable
-                                                                            placeholder="Select source"
-                                                                        />
-                                                                    </Table.Td>
-                                                                    <Table.Td>
-                                                                        <Select
-                                                                            value={transformRow.dst}
-                                                                            onChange={(value) => updateTransform(filter.id, filterRow.id, transformRow.id, 'dst', value || '')}
-                                                                            data={HL7_SELECT_DATA}
-                                                                            searchable
-                                                                            clearable
-                                                                            placeholder="Select destination"
-                                                                        />
-                                                                    </Table.Td>
-                                                                    <Table.Td>
-                                                                        <Select
-                                                                            value={transformRow.command}
-                                                                            onChange={(value) => updateTransform(filter.id, filterRow.id, transformRow.id, 'command', value || 'replace')}
-                                                                            data={TRANSFORM_COMMAND_OPTIONS}
-                                                                        />
-                                                                    </Table.Td>
-                                                                    <Table.Td>
-                                                                        <TextInput
-                                                                            value={transformRow.args}
-                                                                            onChange={(e) => updateTransform(filter.id, filterRow.id, transformRow.id, 'args', e.target.value)}
-                                                                            placeholder="arg1 arg2"
-                                                                        />
-                                                                    </Table.Td>
-                                                                    <Table.Td>
-                                                                        <ActionIcon 
-                                                                            onClick={() => deleteTransform(filter.id, filterRow.id, transformRow.id)}
-                                                                            color="red"
-                                                                            disabled={filterRow.transforms.length === 1}
-                                                                        >
-                                                                            <IconTrash size={16} />
-                                                                        </ActionIcon>
-                                                                    </Table.Td>
-                                                                </Table.Tr>
-                                                            ))}
-                                                        </Table.Tbody>
-                                                    </Table>
-                                                    <Button 
-                                                        onClick={() => addTransform(filter.id, filterRow.id)}
-                                                        leftSection={<IconPlus size={16} />}
-                                                        variant="light"
-                                                        size="sm"
-                                                    >
-                                                        Add Transform
-                                                    </Button>
-                                                </Stack>
-                                            </Table.Td>
-                                        </Table.Tr>
                                     </React.Fragment>
                                 ))}
                             </Table.Tbody>
@@ -648,6 +660,115 @@ export function AppMain() {
                             size="sm"
                         >
                             Add Filter Condition
+                        </Button>
+
+                        <InputLabel size="sm">Transformations</InputLabel>
+                        <Table>
+                            <Table.Thead>
+                                <Table.Tr>
+                                    <Table.Th>Source</Table.Th>
+                                    <Table.Th>Destination</Table.Th>
+                                    <Table.Th>Command</Table.Th>
+                                    <Table.Th>Arguments</Table.Th>
+                                    <Table.Th>Actions</Table.Th>
+                                </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                                {filter.mappings.map((mapping) => (
+                                    <React.Fragment key={mapping.id}>
+                                        <Table.Tr>
+                                            <Table.Td>
+                                                <Select
+                                                    value={mapping.src}
+                                                    onChange={(value) => updateMapping(filter.id, mapping.id, 'src', value || '')}
+                                                    data={HL7_SELECT_DATA}
+                                                    searchable
+                                                    clearable
+                                                    placeholder="Select source"
+                                                />
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Select
+                                                    value={mapping.dst}
+                                                    onChange={(value) => updateMapping(filter.id, mapping.id, 'dst', value || '')}
+                                                    data={HL7_SELECT_DATA}
+                                                    searchable
+                                                    clearable
+                                                    placeholder="Select destination"
+                                                />
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Select
+                                                    value={mapping.transforms[0].command}
+                                                    onChange={(value) => updateTransform(filter.id, mapping.id, mapping.transforms[0].id, 'command', value || 'replace')}
+                                                    data={TRANSFORM_COMMAND_OPTIONS}
+                                                />
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <TextInput
+                                                    value={mapping.transforms[0].args}
+                                                    onChange={(e) => updateTransform(filter.id, mapping.id, mapping.transforms[0].id, 'args', e.target.value)}
+                                                    placeholder="arg1 arg2"
+                                                />
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Group>
+                                                    <ActionIcon 
+                                                        onClick={() => deleteMapping(filter.id, mapping.id)}
+                                                        color="red"
+                                                        disabled={filter.mappings.length === 1}
+                                                    >
+                                                        <IconTrash size={16} />
+                                                    </ActionIcon>
+                                                    <ActionIcon
+                                                        onClick={() => addTransform(filter.id, mapping.id)}
+                                                        color="blue"
+                                                    >
+                                                        <IconPlus size={16} />
+                                                    </ActionIcon>
+                                                </Group>
+                                            </Table.Td>
+                                        </Table.Tr>
+                                        {mapping.transforms.slice(1).map((transform) => (
+                                            <Table.Tr key={transform.id}>
+                                                <Table.Td colSpan={2} />
+                                                <Table.Td>
+                                                    <Select
+                                                        value={transform.command}
+                                                        onChange={(value) => updateTransform(filter.id, mapping.id, transform.id, 'command', value || 'replace')}
+                                                        data={TRANSFORM_COMMAND_OPTIONS}
+                                                    />
+                                                </Table.Td>
+                                                <Table.Td>
+                                                    <TextInput
+                                                        value={transform.args}
+                                                        onChange={(e) => updateTransform(filter.id, mapping.id, transform.id, 'args', e.target.value)}
+                                                        placeholder="arg1 arg2"
+                                                    />
+                                                </Table.Td>
+                                                <Table.Td>
+                                                    <ActionIcon 
+                                                        onClick={() => deleteTransform(filter.id, mapping.id, transform.id)}
+                                                        color="red"
+                                                        disabled={filter.mappings.length === 1}
+                                                    >
+                                                        <IconTrash size={16} />
+                                                    </ActionIcon>
+                                                </Table.Td>
+                                            </Table.Tr>
+                                        ))}
+                                    </React.Fragment>
+                                ))}
+                            </Table.Tbody>
+                        </Table>
+                        
+                        <Button 
+                            onClick={() => addMapping(filter.id)}
+                            leftSection={<IconPlus size={16} />}
+                            variant="light"
+                            size="sm"
+                        >
+                            Add Mapping
                         </Button>
                     </Stack>
                 ))}
