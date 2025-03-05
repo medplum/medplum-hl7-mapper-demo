@@ -1,7 +1,8 @@
-import { Button, Textarea, Group, Stack, Table, TextInput, Select, ActionIcon } from "@mantine/core";
+import { Button, Textarea, Group, Stack, Table, TextInput, Select, ActionIcon, InputLabel } from "@mantine/core";
 import { Hl7Message } from "@medplum/core";
 import { useCallback, useEffect, useState } from "react";
 import { IconArrowUp, IconArrowDown, IconTrash, IconPlus } from "@tabler/icons-react";
+import React from "react";
 
 const oru = Hl7Message.parse(`MSH|^~\\&|MESA_RPT_MGR|EAST_RADIOLOGY|iFW|XYZ|||ORU^R01|MESA3b|P|2.4||||||||
     PID|||CR3^^^ADT1||CRTHREE^PAUL|||||||||||||PatientAcct||||||||||||
@@ -161,7 +162,76 @@ function getHL7Value(message: Hl7Message, path: string): string {
     return componentIndices.length > 0 ? field.getComponent(parseInt(componentIndices[0])) : field.toString();
 }
 
+type OperatorType = 'AND' | 'OR';
+type FilterCommandType = 'startsWith' | 'contains' | 'endsWith' | 'exact';
 type TransformType = 'replace';
+
+interface TransformRow {
+  id: string;
+  src: string;
+  dst: string;
+  command: TransformType;
+  args: string;
+}
+
+interface FilterRow {
+  id: string;
+  operator: OperatorType;
+  command: FilterCommandType;
+  value: string;
+  transforms: TransformRow[];
+}
+
+interface Filter {
+  id: string;
+  src: string;
+  filterRows: FilterRow[];
+}
+
+const INITIAL_TRANSFORM_ROW: TransformRow = {
+  id: '1',
+  src: '',
+  dst: '',
+  command: 'replace',
+  args: ''
+};
+
+const INITIAL_FILTER_ROW: FilterRow = {
+  id: '1',
+  operator: 'AND',
+  command: 'contains',
+  value: '',
+  transforms: [INITIAL_TRANSFORM_ROW]
+};
+
+const INITIAL_FILTER: Filter = {
+  id: '1',
+  src: '',
+  filterRows: [INITIAL_FILTER_ROW]
+};
+
+const OPERATOR_OPTIONS = [
+  { value: 'AND', label: 'AND' },
+  { value: 'OR', label: 'OR' }
+];
+
+const FILTER_COMMAND_OPTIONS = [
+  { value: 'startsWith', label: 'Starts With' },
+  { value: 'contains', label: 'Contains' },
+  { value: 'endsWith', label: 'Ends With' },
+  { value: 'exact', label: 'Exact Match' }
+];
+
+const TRANSFORM_COMMAND_OPTIONS = [
+  { value: 'replace', label: 'Replace' }
+  // Add more commands as needed
+];
+
+// Add this helper to convert HL7_LABELS to Select data format
+const HL7_SELECT_DATA = Object.entries(HL7_LABELS).map(([key, label]) => ({
+  value: key,
+  label: `${key} - ${label}`
+}));
 
 function setHL7ValueInString(hl7String: string, path: string, value: string): string {
     // Split the path into segment and field parts (e.g., "OBX-7" -> ["OBX", "7"])
@@ -210,98 +280,197 @@ function setHL7ValueInString(hl7String: string, path: string, value: string): st
     return lines.join('\n');
 }
 
-interface TransformRow {
-  id: string;
-  src: string; 
-  dst: string;
-  command: TransformType;
-  args: string;
-}
-
-const INITIAL_ROW: TransformRow = {
-  id: '1',
-  src: '',
-  dst: '',
-  command: 'replace',
-  args: ''
-};
-
-const COMMAND_OPTIONS = [
-  { value: 'replace', label: 'Replace' }
-  // Add more commands as needed
-];
-
-// Add this helper to convert HL7_LABELS to Select data format
-const HL7_SELECT_DATA = Object.entries(HL7_LABELS).map(([key, label]) => ({
-  value: key,
-  label: `${key} - ${label}`
-}));
-
 export function AppMain() {
     const [input, setInput] = useState(oru.toString());
     const [output, setOutput] = useState(oru.toString());
-    const [transformRows, setTransformRows] = useState<TransformRow[]>([INITIAL_ROW]);
+    const [filters, setFilters] = useState<Filter[]>([INITIAL_FILTER]);
 
-    const addRow = () => {
-        setTransformRows(rows => [...rows, {
-            ...INITIAL_ROW,
-            id: (rows.length + 1).toString()
+    const addFilter = () => {
+        setFilters(current => [...current, {
+            ...INITIAL_FILTER,
+            id: (current.length + 1).toString()
         }]);
     };
 
-    const deleteRow = (id: string) => {
-        setTransformRows(rows => rows.filter(row => row.id !== id));
+    const deleteFilter = (filterId: string) => {
+        setFilters(current => current.filter(f => f.id !== filterId));
     };
 
-    const moveRow = (id: string, direction: 'up' | 'down') => {
-        setTransformRows(rows => {
-            const index = rows.findIndex(row => row.id === id);
-            if (direction === 'up' && index > 0) {
-                const newRows = [...rows];
-                [newRows[index - 1], newRows[index]] = [newRows[index], newRows[index - 1]];
-                return newRows;
-            }
-            if (direction === 'down' && index < rows.length - 1) {
-                const newRows = [...rows];
-                [newRows[index], newRows[index + 1]] = [newRows[index + 1], newRows[index]];
-                return newRows;
-            }
-            return rows;
-        });
-    };
-
-    const updateRow = (id: string, field: keyof TransformRow, value: string) => {
-        setTransformRows(rows =>
-            rows.map(row =>
-                row.id === id ? { ...row, [field]: value } : row
+    const updateFilterSource = (filterId: string, src: string) => {
+        setFilters(current =>
+            current.map(filter =>
+                filter.id === filterId ? { ...filter, src } : filter
             )
+        );
+    };
+
+    const addFilterRow = (filterId: string) => {
+        setFilters(current =>
+            current.map(filter => {
+                if (filter.id === filterId) {
+                    return {
+                        ...filter,
+                        filterRows: [...filter.filterRows, {
+                            ...INITIAL_FILTER_ROW,
+                            id: (filter.filterRows.length + 1).toString()
+                        }]
+                    };
+                }
+                return filter;
+            })
+        );
+    };
+
+    const updateFilterRow = (filterId: string, rowId: string, field: keyof FilterRow, value: string) => {
+        setFilters(current =>
+            current.map(filter => {
+                if (filter.id === filterId) {
+                    return {
+                        ...filter,
+                        filterRows: filter.filterRows.map(row =>
+                            row.id === rowId ? { ...row, [field]: value } : row
+                        )
+                    };
+                }
+                return filter;
+            })
+        );
+    };
+
+    const deleteFilterRow = (filterId: string, rowId: string) => {
+        setFilters(current =>
+            current.map(filter => {
+                if (filter.id === filterId) {
+                    return {
+                        ...filter,
+                        filterRows: filter.filterRows.filter(row => row.id !== rowId)
+                    };
+                }
+                return filter;
+            })
+        );
+    };
+
+    const addTransform = (filterId: string, filterRowId: string) => {
+        setFilters(current =>
+            current.map(filter => {
+                if (filter.id === filterId) {
+                    return {
+                        ...filter,
+                        filterRows: filter.filterRows.map(row => {
+                            if (row.id === filterRowId) {
+                                return {
+                                    ...row,
+                                    transforms: [...row.transforms, {
+                                        ...INITIAL_TRANSFORM_ROW,
+                                        id: (row.transforms.length + 1).toString()
+                                    }]
+                                };
+                            }
+                            return row;
+                        })
+                    };
+                }
+                return filter;
+            })
+        );
+    };
+
+    const updateTransform = (filterId: string, filterRowId: string, transformId: string, field: keyof TransformRow, value: string) => {
+        setFilters(current =>
+            current.map(filter => {
+                if (filter.id === filterId) {
+                    return {
+                        ...filter,
+                        filterRows: filter.filterRows.map(row => {
+                            if (row.id === filterRowId) {
+                                return {
+                                    ...row,
+                                    transforms: row.transforms.map(transform =>
+                                        transform.id === transformId ? { ...transform, [field]: value } : transform
+                                    )
+                                };
+                            }
+                            return row;
+                        })
+                    };
+                }
+                return filter;
+            })
+        );
+    };
+
+    const deleteTransform = (filterId: string, filterRowId: string, transformId: string) => {
+        setFilters(current =>
+            current.map(filter => {
+                if (filter.id === filterId) {
+                    return {
+                        ...filter,
+                        filterRows: filter.filterRows.map(row => {
+                            if (row.id === filterRowId) {
+                                return {
+                                    ...row,
+                                    transforms: row.transforms.filter(t => t.id !== transformId)
+                                };
+                            }
+                            return row;
+                        })
+                    };
+                }
+                return filter;
+            })
         );
     };
 
     const transform = useCallback(() => {
         let message = Hl7Message.parse(input);
         
-        for (const row of transformRows) {
-            const srcValue = getHL7Value(message, row.src);
-            const args = row.args.split(' '); // Split args string into array
+        // Apply filters and their associated transforms
+        for (const filter of filters) {
+            const srcValue = getHL7Value(message, filter.src);
             
-            switch (row.command) {
-                case 'replace':
-                    message = Hl7Message.parse(setHL7ValueInString(
-                        message.toString(), 
-                        row.dst, 
-                        srcValue.replace(args[0], args[1])
-                    ));
-                    break;
+            for (const filterRow of filter.filterRows) {
+                const matches = (() => {
+                    switch (filterRow.command) {
+                        case 'startsWith':
+                            return srcValue.startsWith(filterRow.value);
+                        case 'contains':
+                            return srcValue.includes(filterRow.value);
+                        case 'endsWith':
+                            return srcValue.endsWith(filterRow.value);
+                        case 'exact':
+                            return srcValue === filterRow.value;
+                        default:
+                            return false;
+                    }
+                })();
+
+                // If filter matches, apply its transforms
+                if (matches) {
+                    for (const transform of filterRow.transforms) {
+                        const transformSrcValue = getHL7Value(message, transform.src);
+                        const args = transform.args.split(' ');
+                        
+                        switch (transform.command) {
+                            case 'replace':
+                                message = Hl7Message.parse(setHL7ValueInString(
+                                    message.toString(), 
+                                    transform.dst, 
+                                    transformSrcValue.replace(args[0], args[1])
+                                ));
+                                break;
+                        }
+                    }
+                }
             }
         }
         
         setOutput(message.toString());
-    }, [input, transformRows]);
+    }, [input, filters]);
 
     return (
         <div style={{ height: '100vh' }}>
-            <Stack>
+            <Stack gap="md">
                 <Group grow>
                     <Textarea
                         autosize
@@ -324,81 +493,171 @@ export function AppMain() {
                     />
                 </Group>
                 
-                <Table>
-                    <Table.Thead>
-                        <Table.Tr>
-                            <Table.Th>Source</Table.Th>
-                            <Table.Th>Destination</Table.Th>
-                            <Table.Th>Command</Table.Th>
-                            <Table.Th>Arguments</Table.Th>
-                            <Table.Th>Actions</Table.Th>
-                        </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                        {transformRows.map((row, index) => (
-                            <Table.Tr key={row.id}>
-                                <Table.Td>
-                                    <Select
-                                        value={row.src}
-                                        onChange={(value) => updateRow(row.id, 'src', value || '')}
-                                        data={HL7_SELECT_DATA}
-                                        searchable
-                                        clearable
-                                        placeholder="Select source field"
-                                    />
-                                </Table.Td>
-                                <Table.Td>
-                                    <Select
-                                        value={row.dst}
-                                        onChange={(value) => updateRow(row.id, 'dst', value || '')}
-                                        data={HL7_SELECT_DATA}
-                                        searchable
-                                        clearable
-                                        placeholder="Select destination field"
-                                    />
-                                </Table.Td>
-                                <Table.Td>
-                                    <Select
-                                        value={row.command}
-                                        onChange={(value) => updateRow(row.id, 'command', value || 'replace')}
-                                        data={COMMAND_OPTIONS}
-                                    />
-                                </Table.Td>
-                                <Table.Td>
-                                    <TextInput
-                                        value={row.args}
-                                        onChange={(e) => updateRow(row.id, 'args', e.target.value)}
-                                        placeholder="arg1 arg2"
-                                    />
-                                </Table.Td>
-                                <Table.Td>
-                                    <Group>
-                                        <ActionIcon 
-                                            onClick={() => moveRow(row.id, 'up')}
-                                            disabled={index === 0}
-                                        >
-                                            <IconArrowUp size={16} />
-                                        </ActionIcon>
-                                        <ActionIcon 
-                                            onClick={() => moveRow(row.id, 'down')}
-                                            disabled={index === transformRows.length - 1}
-                                        >
-                                            <IconArrowDown size={16} />
-                                        </ActionIcon>
-                                        <ActionIcon 
-                                            onClick={() => deleteRow(row.id)}
-                                            color="red"
-                                        >
-                                            <IconTrash size={16} />
-                                        </ActionIcon>
-                                    </Group>
-                                </Table.Td>
-                            </Table.Tr>
-                        ))}
-                    </Table.Tbody>
-                </Table>
-                <Button onClick={addRow} leftSection={<IconPlus size={16} />}>
-                    Add Row
+                <InputLabel size="sm">Filters</InputLabel>
+                {filters.map(filter => (
+                    <Stack key={filter.id} gap="xs">
+                        <Group justify="space-between">
+                            <Select
+                                label="Source Field"
+                                value={filter.src}
+                                onChange={(value) => updateFilterSource(filter.id, value || '')}
+                                data={HL7_SELECT_DATA}
+                                searchable
+                                clearable
+                                placeholder="Select source field"
+                                style={{ width: '300px' }}
+                            />
+                            <ActionIcon 
+                                onClick={() => deleteFilter(filter.id)}
+                                color="red"
+                                variant="subtle"
+                            >
+                                <IconTrash size={16} />
+                            </ActionIcon>
+                        </Group>
+                        
+                        <InputLabel size="sm">Filter Conditions</InputLabel>
+                        <Table>
+                            <Table.Thead>
+                                <Table.Tr>
+                                    <Table.Th>Operator</Table.Th>
+                                    <Table.Th>Command</Table.Th>
+                                    <Table.Th>Value</Table.Th>
+                                    <Table.Th>Actions</Table.Th>
+                                </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                                {filter.filterRows.map((filterRow) => (
+                                    <React.Fragment key={filterRow.id}>
+                                        <Table.Tr>
+                                            <Table.Td>
+                                                <Select
+                                                    value={filterRow.operator}
+                                                    onChange={(value) => updateFilterRow(filter.id, filterRow.id, 'operator', value || 'AND')}
+                                                    data={OPERATOR_OPTIONS}
+                                                />
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Select
+                                                    value={filterRow.command}
+                                                    onChange={(value) => updateFilterRow(filter.id, filterRow.id, 'command', value || 'contains')}
+                                                    data={FILTER_COMMAND_OPTIONS}
+                                                />
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <TextInput
+                                                    value={filterRow.value}
+                                                    onChange={(e) => updateFilterRow(filter.id, filterRow.id, 'value', e.target.value)}
+                                                    placeholder="Filter value..."
+                                                />
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <ActionIcon 
+                                                    onClick={() => deleteFilterRow(filter.id, filterRow.id)}
+                                                    color="red"
+                                                    disabled={filter.filterRows.length === 1}
+                                                >
+                                                    <IconTrash size={16} />
+                                                </ActionIcon>
+                                            </Table.Td>
+                                        </Table.Tr>
+                                        <Table.Tr>
+                                            <Table.Td colSpan={4}>
+                                                <Stack gap="xs" pl="xl">
+                                                    <InputLabel size="sm">Transformations</InputLabel>
+                                                    <Table>
+                                                        <Table.Thead>
+                                                            <Table.Tr>
+                                                                <Table.Th>Source</Table.Th>
+                                                                <Table.Th>Destination</Table.Th>
+                                                                <Table.Th>Command</Table.Th>
+                                                                <Table.Th>Arguments</Table.Th>
+                                                                <Table.Th>Actions</Table.Th>
+                                                            </Table.Tr>
+                                                        </Table.Thead>
+                                                        <Table.Tbody>
+                                                            {filterRow.transforms.map((transformRow) => (
+                                                                <Table.Tr key={transformRow.id}>
+                                                                    <Table.Td>
+                                                                        <Select
+                                                                            value={transformRow.src}
+                                                                            onChange={(value) => updateTransform(filter.id, filterRow.id, transformRow.id, 'src', value || '')}
+                                                                            data={HL7_SELECT_DATA}
+                                                                            searchable
+                                                                            clearable
+                                                                            placeholder="Select source"
+                                                                        />
+                                                                    </Table.Td>
+                                                                    <Table.Td>
+                                                                        <Select
+                                                                            value={transformRow.dst}
+                                                                            onChange={(value) => updateTransform(filter.id, filterRow.id, transformRow.id, 'dst', value || '')}
+                                                                            data={HL7_SELECT_DATA}
+                                                                            searchable
+                                                                            clearable
+                                                                            placeholder="Select destination"
+                                                                        />
+                                                                    </Table.Td>
+                                                                    <Table.Td>
+                                                                        <Select
+                                                                            value={transformRow.command}
+                                                                            onChange={(value) => updateTransform(filter.id, filterRow.id, transformRow.id, 'command', value || 'replace')}
+                                                                            data={TRANSFORM_COMMAND_OPTIONS}
+                                                                        />
+                                                                    </Table.Td>
+                                                                    <Table.Td>
+                                                                        <TextInput
+                                                                            value={transformRow.args}
+                                                                            onChange={(e) => updateTransform(filter.id, filterRow.id, transformRow.id, 'args', e.target.value)}
+                                                                            placeholder="arg1 arg2"
+                                                                        />
+                                                                    </Table.Td>
+                                                                    <Table.Td>
+                                                                        <ActionIcon 
+                                                                            onClick={() => deleteTransform(filter.id, filterRow.id, transformRow.id)}
+                                                                            color="red"
+                                                                            disabled={filterRow.transforms.length === 1}
+                                                                        >
+                                                                            <IconTrash size={16} />
+                                                                        </ActionIcon>
+                                                                    </Table.Td>
+                                                                </Table.Tr>
+                                                            ))}
+                                                        </Table.Tbody>
+                                                    </Table>
+                                                    <Button 
+                                                        onClick={() => addTransform(filter.id, filterRow.id)}
+                                                        leftSection={<IconPlus size={16} />}
+                                                        variant="light"
+                                                        size="sm"
+                                                    >
+                                                        Add Transform
+                                                    </Button>
+                                                </Stack>
+                                            </Table.Td>
+                                        </Table.Tr>
+                                    </React.Fragment>
+                                ))}
+                            </Table.Tbody>
+                        </Table>
+                        
+                        <Button 
+                            onClick={() => addFilterRow(filter.id)}
+                            leftSection={<IconPlus size={16} />}
+                            variant="light"
+                            size="sm"
+                        >
+                            Add Filter Condition
+                        </Button>
+                    </Stack>
+                ))}
+                
+                <Button 
+                    onClick={addFilter}
+                    leftSection={<IconPlus size={16} />}
+                    variant="outline"
+                >
+                    Add Filter
                 </Button>
             </Stack>
         </div>
