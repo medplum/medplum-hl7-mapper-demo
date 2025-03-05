@@ -195,7 +195,7 @@ interface Filter {
 
 const INITIAL_TRANSFORM: Transform = {
   id: '1',
-  command: 'replace',
+  command: 'passthrough',
   args: ''
 };
 
