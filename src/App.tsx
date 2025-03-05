@@ -54,12 +54,11 @@ OBX|1|HD|SR Instance UID||1.113654.1.2001.30.2.1||||||F||||||
 OBX|2|TX|SR Text||Radiology Report History Cough Findings PA evaluation of the chest demonstrates the lungs to be expanded and clear.  Conclusions Normal PA chest x-ray.||||||F||||||
 `);
 
-const FIELDS = ["name", "gender", "birthDate", "deceased[x]"];
 
-// Hardcode one box to hold message
+// Hardcode one box to hold message (oru)
 // Transform button
 /// Another box
-// onClick transform button, call transform
+// onClick transform button, call transform fn
 // transform(input, transformChain, output)
 
 function App() {
@@ -81,6 +80,7 @@ function App() {
   return (
     <div className="App">
       <h1>HL7v2 to FHIR Mapper</h1>
+      <div className="input-output"></div>
       <DragDropContext onDragEnd={handleOnDragEnd}>
         <Group style={{ width: "100%" }} preventGrowOverflow justify="space-between" gap="xl" grow>
           <div className="characters">
