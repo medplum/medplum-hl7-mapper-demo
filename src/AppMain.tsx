@@ -3,6 +3,7 @@ import { Hl7Message } from "@medplum/core";
 import { useCallback, useEffect, useState } from "react";
 import { IconArrowUp, IconArrowDown, IconTrash, IconPlus } from "@tabler/icons-react";
 import React from "react";
+import { diffChars } from 'diff';
 
 const oru = Hl7Message.parse(`MSH|^~\\&|MESA_RPT_MGR|EAST_RADIOLOGY|iFW|XYZ|||ORU^R01|MESA3b|P|2.4||||||||
     PID|||CR3^^^ADT1||CRTHREE^PAUL|||||||||||||PatientAcct||||||||||||
@@ -291,9 +292,51 @@ function setHL7ValueInString(hl7String: string, path: string, value: string): st
     return lines.join('\n');
 }
 
+// Add this type for diff styling
+interface DiffStyles {
+  added: React.CSSProperties;
+  removed: React.CSSProperties;
+  unchanged: React.CSSProperties;
+}
+
+const diffStyles: DiffStyles = {
+  added: {
+    backgroundColor: 'rgba(0, 255, 0, 0.2)',
+    color: 'darkgreen',
+  },
+  removed: {
+    backgroundColor: 'rgba(255, 0, 0, 0.2)',
+    color: 'darkred',
+  },
+  unchanged: {
+    color: 'inherit',
+  },
+};
+
+// Add this component for rendering diffs
+function DiffView({ actual, expected }: { actual: string; expected: string }) {
+  const diff = diffChars(expected, actual);
+  
+  return (
+    <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+      {diff.map((part, index) => {
+        const style = part.added ? diffStyles.added : 
+                     part.removed ? diffStyles.removed : 
+                     diffStyles.unchanged;
+        return (
+          <span key={index} style={style}>
+            {part.value}
+          </span>
+        );
+      })}
+    </pre>
+  );
+}
+
 export function AppMain() {
     const [input, setInput] = useState(oru.toString());
     const [output, setOutput] = useState(oru.toString());
+    const [expected, setExpected] = useState(oru.toString());
     const [filters, setFilters] = useState<Filter[]>([INITIAL_FILTER]);
 
     const addFilter = () => {
@@ -570,14 +613,34 @@ export function AppMain() {
                     <Button onClick={transform} my="sm">
                         Transform
                     </Button>
-                    <Textarea
-                        autosize
-                        label="Output"
-                        resize="vertical"
-                        minRows={10}
-                        readOnly
-                        value={output}
-                    />
+                    <Stack gap="xs" style={{ flex: 1 }}>
+                        <Textarea
+                            autosize
+                            label="Expected"
+                            resize="vertical"
+                            minRows={10}
+                            value={expected}
+                            onChange={(e) => setExpected(e.target.value)}
+                        />
+                        <Textarea
+                            autosize
+                            label="Actual Output"
+                            resize="vertical"
+                            minRows={10}
+                            readOnly
+                            value={output}
+                        />
+                        <InputLabel>Diff (Expected vs Actual)</InputLabel>
+                        <div style={{ 
+                            border: '1px solid #ccc', 
+                            borderRadius: '4px', 
+                            padding: '8px',
+                            maxHeight: '200px',
+                            overflowY: 'auto'
+                        }}>
+                            <DiffView actual={output} expected={expected} />
+                        </div>
+                    </Stack>
                 </Group>
                 
                 <InputLabel size="sm">Filters</InputLabel>
