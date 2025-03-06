@@ -4,6 +4,7 @@ import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { diffChars } from "diff";
 import React, { useCallback, useState } from "react";
 import { Filter, FilterRow, Mapping, Transform, applyTransforms } from "./util/transform";
+import { saveAs } from 'file-saver';
 
 const oru = Hl7Message.parse(`MSH|^~\\&|MESA_RPT_MGR|EAST_RADIOLOGY|iFW|XYZ|||ORU^R01|MESA3b|P|2.4||||||||
     PID|||CR3^^^ADT1||CRTHREE^PAUL|||||||||||||PatientAcct||||||||||||
@@ -440,6 +441,30 @@ export function AppMain() {
     setOutput(transformedMessage.toString());
   }, [input, filters]);
 
+  const exportBot = () => {
+    // Create the bot.ts file content
+    const filtersJson = JSON.stringify(filters, null, 2);
+    
+    const fileContent = `import { Hl7Message, applyTransforms } from '@medplum/hl7';
+
+// Encoded filters from the UI
+const FILTERS = ${filtersJson};
+
+/**
+ * Transforms an HL7 message using the configured filters
+ * @param input The input HL7 message
+ * @returns The transformed HL7 message
+ */
+export default function transform(input: Hl7Message): Hl7Message {
+  return applyTransforms(input, FILTERS);
+}
+`;
+
+    // Create a blob and save it
+    const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+    saveAs(blob, 'bot.ts');
+  };
+
   return (
     <div style={{ height: "100vh" }}>
       <Stack gap="md">
@@ -452,9 +477,14 @@ export function AppMain() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />
-          <Button onClick={transform} my="sm">
-            Transform
-          </Button>
+          <Stack>
+            <Button onClick={transform} my="sm">
+              Transform
+            </Button>
+            <Button onClick={exportBot} my="sm" variant="outline">
+              Export Bot
+            </Button>
+          </Stack>
           <Stack gap="xs" style={{ flex: 1 }}>
             <Textarea
               autosize
