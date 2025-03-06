@@ -2,12 +2,12 @@ import { Hl7Message } from "@medplum/core";
 
 // Types from AppMain.tsx
 export type OperatorType = 'AND' | 'OR';
-export type FilterCommandType = 'startsWith' | 'contains' | 'endsWith' | 'exact';
-export type TransformType = 'replace' | 'passthrough';
+export type FilterFunctionType = 'startsWith' | 'contains' | 'endsWith' | 'exact';
+export type TransformFunctionType = 'replace' | 'passthrough' | 'addPrefix' | 'removePrefix' | 'addSuffix' | 'removeSuffix';
 
 export interface Transform {
   id: string;
-  command: TransformType;
+  command: TransformFunctionType;
   args: string;
 }
 
@@ -21,7 +21,7 @@ export interface Mapping {
 export interface FilterRow {
   id: string;
   operator: OperatorType;
-  command: FilterCommandType;
+  command: FilterFunctionType;
   value: string;
 }
 
@@ -170,6 +170,26 @@ export function applyTransforms(message: Hl7Message, filters: Filter[]): Hl7Mess
             case 'replace': {
               const args = transform.args.split(' ');
               currentValue = currentValue.replace(args[0], args[1]);
+              break;
+            }
+            case 'addPrefix': {
+              currentValue = transform.args + currentValue;
+              break;
+            }
+            case 'removePrefix': {
+              if (currentValue.startsWith(transform.args)) {
+                currentValue = currentValue.substring(transform.args.length);
+              }
+              break;
+            }
+            case 'addSuffix': {
+              currentValue = currentValue + transform.args;
+              break;
+            }
+            case 'removeSuffix': {
+              if (currentValue.endsWith(transform.args)) {
+                currentValue = currentValue.substring(0, currentValue.length - transform.args.length);
+              }
               break;
             }
             case 'passthrough':

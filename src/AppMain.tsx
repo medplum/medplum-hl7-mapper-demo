@@ -175,17 +175,21 @@ const OPERATOR_OPTIONS = [
   { value: "OR", label: "OR" },
 ];
 
-const FILTER_COMMAND_OPTIONS = [
+const FILTER_FUNCTION_OPTIONS = [
   { value: "startsWith", label: "Starts With" },
   { value: "contains", label: "Contains" },
   { value: "endsWith", label: "Ends With" },
   { value: "exact", label: "Exact Match" },
 ];
 
-const TRANSFORM_COMMAND_OPTIONS = [
+const TRANSFORM_FUNCTION_OPTIONS = [
   { value: "replace", label: "Replace" },
   { value: "passthrough", label: "Passthrough" },
-  // Add more commands as needed
+  { value: "addPrefix", label: "Add Prefix" },
+  { value: "removePrefix", label: "Remove Prefix" },
+  { value: "addSuffix", label: "Add Suffix" },
+  { value: "removeSuffix", label: "Remove Suffix" },
+  // Add more functions as needed
 ];
 
 // Add this helper to convert HL7_LABELS to Select data format
@@ -534,7 +538,7 @@ export default function transform(input: Hl7Message): Hl7Message {
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Operator</Table.Th>
-                  <Table.Th>Command</Table.Th>
+                  <Table.Th>Function</Table.Th>
                   <Table.Th>Value</Table.Th>
                   <Table.Th>Actions</Table.Th>
                 </Table.Tr>
@@ -554,7 +558,7 @@ export default function transform(input: Hl7Message): Hl7Message {
                         <Select
                           value={filterRow.command}
                           onChange={(value) => updateFilterRow(filter.id, filterRow.id, "command", value || "contains")}
-                          data={FILTER_COMMAND_OPTIONS}
+                          data={FILTER_FUNCTION_OPTIONS}
                         />
                       </Table.Td>
                       <Table.Td>
@@ -594,7 +598,7 @@ export default function transform(input: Hl7Message): Hl7Message {
                 <Table.Tr>
                   <Table.Th>Source</Table.Th>
                   <Table.Th>Destination</Table.Th>
-                  <Table.Th>Command</Table.Th>
+                  <Table.Th>Function</Table.Th>
                   <Table.Th>Arguments</Table.Th>
                   <Table.Th>Actions</Table.Th>
                 </Table.Tr>
@@ -635,7 +639,7 @@ export default function transform(input: Hl7Message): Hl7Message {
                               value || "replace"
                             )
                           }
-                          data={TRANSFORM_COMMAND_OPTIONS}
+                          data={TRANSFORM_FUNCTION_OPTIONS}
                         />
                       </Table.Td>
                       <Table.Td>
@@ -671,7 +675,7 @@ export default function transform(input: Hl7Message): Hl7Message {
                             onChange={(value) =>
                               updateTransform(filter.id, mapping.id, transform.id, "command", value || "replace")
                             }
-                            data={TRANSFORM_COMMAND_OPTIONS}
+                            data={TRANSFORM_FUNCTION_OPTIONS}
                           />
                         </Table.Td>
                         <Table.Td>
