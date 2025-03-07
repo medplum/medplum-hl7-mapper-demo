@@ -1,9 +1,9 @@
 import { ActionIcon, Button, Group, InputLabel, Select, Stack, Table, TextInput, Textarea, Drawer, List, ThemeIcon } from "@mantine/core";
 import { Hl7Message } from "@medplum/core";
-import { IconPlus, IconTrash, IconMenu2, IconMessage, IconCheck } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconMenu2, IconMessage, IconCheck, IconDeviceFloppy } from "@tabler/icons-react";
 import { diffChars } from "diff";
-import React, { useCallback, useState } from "react";
-import { Filter, FilterRow, Mapping, Transform, applyTransforms, getHL7Value } from "./util/transform";
+import React, { useCallback, useState, useEffect } from "react";
+import { Filter, FilterRow, Mapping, Transform, applyTransforms } from "./util/transform";
 import { saveAs } from 'file-saver';
 
 // Define a type for our message templates
@@ -13,8 +13,8 @@ interface MessageTemplate {
   expected: string;
 }
 
-// Create a list of sample messages
-const messageTemplates: MessageTemplate[] = [
+// Create a list of default sample messages
+const DEFAULT_TEMPLATES: MessageTemplate[] = [
   {
     name: "ORU R01 - Radiology Report",
     input: `MSH|^~\\&|MESA_RPT_MGR|EAST_RADIOLOGY|iFW|XYZ|||ORU^R01|MESA3b|P|2.4||||||||
@@ -54,8 +54,33 @@ const messageTemplates: MessageTemplate[] = [
   }
 ];
 
-const oru = Hl7Message.parse(messageTemplates[0].input);
-const oruExpected = Hl7Message.parse(messageTemplates[0].expected);
+// Local storage key
+const STORAGE_KEY = 'medplum:hl7Templates';
+
+// Helper function to load templates from localStorage
+const loadTemplatesFromStorage = (): MessageTemplate[] => {
+  try {
+    const storedTemplates = localStorage.getItem(STORAGE_KEY);
+    if (storedTemplates) {
+      return JSON.parse(storedTemplates);
+    }
+  } catch (error) {
+    console.error('Error loading templates from localStorage:', error);
+  }
+  return DEFAULT_TEMPLATES;
+};
+
+// Helper function to save templates to localStorage
+const saveTemplatesToStorage = (templates: MessageTemplate[]): void => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
+  } catch (error) {
+    console.error('Error saving templates to localStorage:', error);
+  }
+};
+
+const oru = Hl7Message.parse(DEFAULT_TEMPLATES[0].input);
+const oruExpected = Hl7Message.parse(DEFAULT_TEMPLATES[0].expected);
 
 // TODO: Display each transform as a row
 // Each row has dropdowns for src, dst, command, and args are freetext fields
@@ -280,13 +305,76 @@ export function AppMain() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedMessageIndex, setSelectedMessageIndex] = useState(0);
   const [generatedBotCode, setGeneratedBotCode] = useState<string>('');
+  const [newTemplateName, setNewTemplateName] = useState<string>('');
+  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
+
+  // Load templates from localStorage on component mount
+  useEffect(() => {
+    const loadedTemplates = loadTemplatesFromStorage();
+    setTemplates(loadedTemplates);
+    
+    // Set initial input and expected from the first template
+    if (loadedTemplates.length > 0) {
+      setInput(loadedTemplates[0].input);
+      setExpected(loadedTemplates[0].expected);
+    }
+  }, []);
+
+  // Save templates to localStorage whenever they change
+  useEffect(() => {
+    if (templates.length > 0) {
+      saveTemplatesToStorage(templates);
+    }
+  }, [templates]);
 
   // Function to select a message template
   const selectMessageTemplate = (index: number) => {
-    setInput(messageTemplates[index].input);
-    setExpected(messageTemplates[index].expected);
+    setInput(templates[index].input);
+    setExpected(templates[index].expected);
     setSelectedMessageIndex(index);
     setSidebarOpen(false); // Close sidebar after selection
+  };
+
+  // Function to save current input/expected as a new template
+  const saveTemplate = () => {
+    if (!newTemplateName.trim()) {
+      alert('Please enter a name for the template');
+      return;
+    }
+
+    const newTemplate: MessageTemplate = {
+      name: newTemplateName.trim(),
+      input: input,
+      expected: expected
+    };
+
+    setTemplates(prev => [...prev, newTemplate]);
+    setNewTemplateName(''); // Clear the input field
+    setSidebarOpen(true); // Open the sidebar to show the new template
+    setSelectedMessageIndex(templates.length); // Select the new template
+  };
+
+  // Function to delete a template
+  const deleteTemplate = (index: number, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent triggering the selectMessageTemplate
+    
+    if (window.confirm(`Are you sure you want to delete the template "${templates[index].name}"?`)) {
+      setTemplates(prev => {
+        const newTemplates = [...prev];
+        newTemplates.splice(index, 1);
+        return newTemplates;
+      });
+      
+      // If we deleted the currently selected template, select the first one
+      if (index === selectedMessageIndex) {
+        if (templates.length > 1) {
+          selectMessageTemplate(0);
+        }
+      } else if (index < selectedMessageIndex) {
+        // If we deleted a template before the selected one, adjust the index
+        setSelectedMessageIndex(selectedMessageIndex - 1);
+      }
+    }
   };
 
   const addFilter = () => {
@@ -754,7 +842,7 @@ ${mapping.transforms.map((transform, transformIndex) => {
         size="sm"
       >
         <List spacing="xs">
-          {messageTemplates.map((template, index) => (
+          {templates.map((template, index) => (
             <List.Item
               key={index}
               onClick={() => selectMessageTemplate(index)}
@@ -762,7 +850,10 @@ ${mapping.transforms.map((transform, transformIndex) => {
                 cursor: 'pointer', 
                 padding: '8px',
                 backgroundColor: selectedMessageIndex === index ? '#f0f0f0' : 'transparent',
-                borderRadius: '4px'
+                borderRadius: '4px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
               }}
               icon={
                 <ThemeIcon color={selectedMessageIndex === index ? "blue" : "gray"} size={24} radius="xl">
@@ -770,7 +861,18 @@ ${mapping.transforms.map((transform, transformIndex) => {
                 </ThemeIcon>
               }
             >
-              {template.name}
+              <div style={{ flex: 1 }}>{template.name}</div>
+              {/* Don't allow deleting the default templates */}
+              {index >= DEFAULT_TEMPLATES.length && (
+                <ActionIcon 
+                  color="red" 
+                  variant="subtle" 
+                  onClick={(e) => deleteTemplate(index, e)}
+                  size="sm"
+                >
+                  <IconTrash size={16} />
+                </ActionIcon>
+              )}
             </List.Item>
           ))}
         </List>
@@ -790,14 +892,32 @@ ${mapping.transforms.map((transform, transformIndex) => {
         </Group>
 
         <Group grow>
-          <Textarea
-            autosize
-            label="Input"
-            resize="vertical"
-            minRows={10}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-          />
+          <Stack>
+            <Textarea
+              autosize
+              label="Input"
+              resize="vertical"
+              minRows={10}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+            />
+            <Group>
+              <TextInput
+                placeholder="Template name"
+                label="Name"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <Button 
+                onClick={saveTemplate}
+                leftSection={<IconDeviceFloppy size={16} />}
+                style={{ marginTop: 'auto' }}
+              >
+                Save
+              </Button>
+            </Group>
+          </Stack>
           <Stack>
             <Button onClick={transform} my="sm">
               Transform
