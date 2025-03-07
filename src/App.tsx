@@ -1,4 +1,4 @@
-import { ActionIcon, Button, Group, InputLabel, Select, Stack, Table, TextInput, Textarea, Drawer, List, ThemeIcon } from "@mantine/core";
+import { ActionIcon, Button, Group, InputLabel, Select, Stack, Table, TextInput, Textarea, Drawer, List, ThemeIcon, Divider } from "@mantine/core";
 import { Hl7Message } from "@medplum/core";
 import { IconPlus, IconTrash, IconMenu2, IconMessage, IconCheck, IconDeviceFloppy } from "@tabler/icons-react";
 import { diffChars } from "diff";
@@ -24,10 +24,10 @@ const DEFAULT_TEMPLATES: MessageTemplate[] = [
     OBX|1|HD|SR Instance UID||1.113654.1.2001.30.2.1||||||F||||||
     OBX|2|TX|SR Text||Radiology Report History Cough Findings PA evaluation of the chest demonstrates the lungs to be expanded and clear.  Conclusions Normal PA chest x-ray.||||||F||||||`,
     expected: `MSH|^~\\&|mesa_RPT_MGR|EAST_radiology|iFW|XYZ|||ORU^R01|MESA3b|P|2.4||||||||
-    PID|||CR3^^^ADT1||CRTHREE^PAUL|||||||||||||PatientAcct||||||||||||
-    PV1||1|CE||||12345^SMITH^BARON^H|||||||||||
-    OBR|||||||20010501141500.0000||||||||||||||||||F||||||||||||||||||
-    OBX|1|HD|SR Instance UID||1.113654.1.2001.30.2.1||||||F||||||
+PID|||CR3^^^ADT1||CRTHREE^PAUL|||||||||||||PatientAcct||||||||||||
+PV1||1|CE||||12345^SMITH^BARON^H|||||||||||
+OBR|||||||20010501141500.0000||||||||||||||||||F||||||||||||||||||
+OBX|1|HD|SR Instance UID||1.113654.1.2001.30.2.1||||||F||||||
     OBX|2|TX|SR Text||Radiology Report History Cough Findings PA evaluation of the chest demonstrates the lungs to be expanded and clear.  Conclusions Normal PA chest x-ray.||||||F||||||`
   },
   {
@@ -888,14 +888,6 @@ ${mapping.transforms.map((transform, transformIndex) => {
 
         <Group grow>
           <Stack>
-            <Textarea
-              autosize
-              label="Input"
-              resize="vertical"
-              minRows={10}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-            />
             <Group>
               <TextInput
                 placeholder="Template name"
@@ -912,6 +904,22 @@ ${mapping.transforms.map((transform, transformIndex) => {
                 Save
               </Button>
             </Group>
+            <Textarea
+              autosize
+              label="Input"
+              resize="vertical"
+              minRows={10}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+            />
+            <Textarea
+              autosize
+              label="Expected"
+              resize="vertical"
+              minRows={10}
+              value={expected}
+              onChange={(e) => setExpected(e.target.value)}
+            />
           </Stack>
           <Stack>
             <Button onClick={transform} my="sm">
@@ -922,14 +930,6 @@ ${mapping.transforms.map((transform, transformIndex) => {
             </Button>
           </Stack>
           <Stack gap="xs" style={{ flex: 1 }}>
-            <Textarea
-              autosize
-              label="Expected"
-              resize="vertical"
-              minRows={10}
-              value={expected}
-              onChange={(e) => setExpected(e.target.value)}
-            />
             <Textarea autosize label="Actual Output" resize="vertical" minRows={10} readOnly value={output} />
             <InputLabel>Diff (Expected vs Actual)</InputLabel>
             <div
@@ -942,9 +942,11 @@ ${mapping.transforms.map((transform, transformIndex) => {
               }}
             >
               <DiffView actual={output} expected={expected} />
-            </div>
+          </div>
           </Stack>
         </Group>
+
+        <Divider my="md" size="sm" />
 
         <InputLabel size="sm">Filters</InputLabel>
         {filters.map((filter) => (
