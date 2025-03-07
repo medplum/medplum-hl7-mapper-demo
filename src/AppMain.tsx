@@ -850,10 +850,7 @@ ${mapping.transforms.map((transform, transformIndex) => {
                 cursor: 'pointer', 
                 padding: '8px',
                 backgroundColor: selectedMessageIndex === index ? '#f0f0f0' : 'transparent',
-                borderRadius: '4px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
+                borderRadius: '4px'
               }}
               icon={
                 <ThemeIcon color={selectedMessageIndex === index ? "blue" : "gray"} size={24} radius="xl">
@@ -861,18 +858,20 @@ ${mapping.transforms.map((transform, transformIndex) => {
                 </ThemeIcon>
               }
             >
-              <div style={{ flex: 1 }}>{template.name}</div>
-              {/* Don't allow deleting the default templates */}
-              {index >= DEFAULT_TEMPLATES.length && (
-                <ActionIcon 
-                  color="red" 
-                  variant="subtle" 
-                  onClick={(e) => deleteTemplate(index, e)}
-                  size="sm"
-                >
-                  <IconTrash size={16} />
-                </ActionIcon>
-              )}
+              <Group justify="space-between" style={{ width: '100%' }}>
+                <div>{template.name}</div>
+                {/* Don't allow deleting the default templates */}
+                {index >= DEFAULT_TEMPLATES.length && (
+                  <ActionIcon 
+                    color="red" 
+                    variant="subtle" 
+                    onClick={(e) => deleteTemplate(index, e)}
+                    size="sm"
+                  >
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                )}
+              </Group>
             </List.Item>
           ))}
         </List>
