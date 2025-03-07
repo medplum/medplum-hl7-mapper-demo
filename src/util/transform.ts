@@ -35,12 +35,13 @@ export interface Filter {
 /**
  * Gets a value from an HL7 message based on a path
  * @param message The HL7 message
- * @param path The path in format "SEGMENT-FIELD[.COMPONENT]"
+ * @param path The path in format "SEGMENT.FIELD[.COMPONENT]"
  * @returns The value at the specified path
  */
 export function getHL7Value(message: Hl7Message, path: string): string {
-  // Split the path into segment and field parts (e.g., "OBX-7" -> ["OBX", "7"])
-  const [segmentId, fieldPath] = path.split('-');
+  // Split the path into segment and field parts (e.g., "OBX.7" -> ["OBX", "7"])
+  const [segmentId, ...parts] = path.split('.');
+  const fieldPath = parts.join('.');
   
   // Get the segment
   const segment = message.getSegment(segmentId);
@@ -54,28 +55,30 @@ export function getHL7Value(message: Hl7Message, path: string): string {
   }
 
   // Split field path for nested components (e.g., "5.1" -> ["5", "1"])
-  const [fieldIndex, ...componentIndices] = fieldPath.split('.');
+  const fieldParts = fieldPath.split('.');
+  const fieldIndex = parseInt(fieldParts[0]);
   
   // Get the field
-  const field = segment.getField(parseInt(fieldIndex));
+  const field = segment.getField(fieldIndex);
   if (!field) {
     return '';
   }
 
   // Get the component if specified
-  return componentIndices.length > 0 ? field.getComponent(parseInt(componentIndices[0])) : field.toString();
+  return fieldParts.length > 1 ? field.getComponent(parseInt(fieldParts[1])) : field.toString();
 }
 
 /**
  * Sets a value in an HL7 message string based on a path
  * @param hl7String The HL7 message as a string
- * @param path The path in format "SEGMENT-FIELD[.COMPONENT]"
+ * @param path The path in format "SEGMENT.FIELD[.COMPONENT]"
  * @param value The value to set
  * @returns The updated HL7 message string
  */
 export function setHL7ValueInString(hl7String: string, path: string, value: string): string {
-  // Split the path into segment and field parts (e.g., "OBX-7" -> ["OBX", "7"])
-  const [segmentId, fieldPath] = path.split('-');
+  // Split the path into segment and field parts (e.g., "OBX.7" -> ["OBX", "7"])
+  const [segmentId, ...parts] = path.split('.');
+  const fieldPath = parts.join('.');
   
   // Split message into lines and find target segment
   const lines = hl7String.split('\n').map(line => line.trim());
@@ -85,9 +88,9 @@ export function setHL7ValueInString(hl7String: string, path: string, value: stri
   }
 
   // Parse the field and component indices (1-based in HL7)
-  const [fieldStr, componentStr] = fieldPath.split('.');
-  const fieldIndex = parseInt(fieldStr);
-  const componentIndex = componentStr ? parseInt(componentStr) : null;
+  const fieldParts = fieldPath.split('.');
+  const fieldIndex = parseInt(fieldParts[0]);
+  const componentIndex = fieldParts.length > 1 ? parseInt(fieldParts[1]) : null;
   
   // Split the segment into fields (separator is |)
   let fields = lines[segmentIndex].split('|');
@@ -169,7 +172,9 @@ export function applyTransforms(message: Hl7Message, filters: Filter[]): Hl7Mess
           switch (transform.command) {
             case 'replace': {
               const args = transform.args.split(' ');
-              currentValue = currentValue.replace(args[0], args[1]);
+              if (args.length >= 2) {
+                currentValue = currentValue.replace(args[0], args[1]);
+              }
               break;
             }
             case 'addPrefix': {

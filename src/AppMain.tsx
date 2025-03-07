@@ -82,117 +82,110 @@ const saveTemplatesToStorage = (templates: MessageTemplate[]): void => {
 const oru = Hl7Message.parse(DEFAULT_TEMPLATES[0].input);
 const oruExpected = Hl7Message.parse(DEFAULT_TEMPLATES[0].expected);
 
-// TODO: Display each transform as a row
-// Each row has dropdowns for src, dst, command, and args are freetext fields
-// There is a button to add a new row
-// There is a button to delete the selected row
-// There is a button to move the selected row up
-// There is a button to move the selected row down
-// There is a button to move the selected row to the top
-// There is a button to move the selected row to the bottom
-
+// Update HL7_LABELS to use dot notation
 const HL7_LABELS = {
-  "MSH-1": "Field Separator",
-  "MSH-2": "Encoding Characters",
-  "MSH-3": "Sending Application",
-  "MSH-4": "Sending Facility",
-  "MSH-5": "Receiving Application",
-  "MSH-6": "Receiving Facility",
-  "MSH-7": "Date/Time of Message",
-  "MSH-9": "Message Type",
-  "MSH-9.1": "Message Code",
-  "MSH-9.2": "Trigger Event",
-  "MSH-9.3": "Message Structure",
-  "MSH-10": "Message Control ID",
-  "MSH-11": "Processing ID",
-  "MSH-12": "Version ID",
+  "MSH.1": "Field Separator",
+  "MSH.2": "Encoding Characters",
+  "MSH.3": "Sending Application",
+  "MSH.4": "Sending Facility",
+  "MSH.5": "Receiving Application",
+  "MSH.6": "Receiving Facility",
+  "MSH.7": "Date/Time of Message",
+  "MSH.9": "Message Type",
+  "MSH.9.1": "Message Code",
+  "MSH.9.2": "Trigger Event",
+  "MSH.9.3": "Message Structure",
+  "MSH.10": "Message Control ID",
+  "MSH.11": "Processing ID",
+  "MSH.12": "Version ID",
 
-  "PID-1": "Set ID - PID",
-  "PID-2": "Patient ID",
-  "PID-3": "Patient Identifier List",
-  "PID-3.1": "ID Number",
-  "PID-3.2": "Check Digit",
-  "PID-3.3": "Check Digit Scheme",
-  "PID-3.4": "Assigning Authority",
-  "PID-3.5": "Identifier Type Code",
-  "PID-4": "Alternate Patient ID",
-  "PID-5": "Patient Name",
-  "PID-5.1": "Family Name",
-  "PID-5.2": "Given Name",
-  "PID-5.3": "Middle Name",
-  "PID-5.4": "Suffix",
-  "PID-5.5": "Prefix",
-  "PID-7": "Date/Time of Birth",
-  "PID-8": "Administrative Sex",
-  "PID-11": "Patient Address",
-  "PID-11.1": "Street Address",
-  "PID-11.2": "Other Designation",
-  "PID-11.3": "City",
-  "PID-11.4": "State/Province",
-  "PID-11.5": "ZIP/Postal Code",
-  "PID-11.6": "Country",
+  "PID.1": "Set ID - PID",
+  "PID.2": "Patient ID",
+  "PID.3": "Patient Identifier List",
+  "PID.3.1": "ID Number",
+  "PID.3.2": "Check Digit",
+  "PID.3.3": "Check Digit Scheme",
+  "PID.3.4": "Assigning Authority",
+  "PID.3.5": "Identifier Type Code",
+  "PID.4": "Alternate Patient ID",
+  "PID.5": "Patient Name",
+  "PID.5.1": "Family Name",
+  "PID.5.2": "Given Name",
+  "PID.5.3": "Middle Name",
+  "PID.5.4": "Suffix",
+  "PID.5.5": "Prefix",
+  "PID.7": "Date/Time of Birth",
+  "PID.8": "Administrative Sex",
+  "PID.11": "Patient Address",
+  "PID.11.1": "Street Address",
+  "PID.11.2": "Other Designation",
+  "PID.11.3": "City",
+  "PID.11.4": "State/Province",
+  "PID.11.5": "ZIP/Postal Code",
+  "PID.11.6": "Country",
 
-  "OBR-1": "Set ID - OBR",
-  "OBR-2": "Placer Order Number",
-  "OBR-3": "Filler Order Number",
-  "OBR-4": "Universal Service ID",
-  "OBR-4.1": "Identifier",
-  "OBR-4.2": "Text",
-  "OBR-4.3": "Name of Coding System",
-  "OBR-7": "Observation Date/Time",
-  "OBR-8": "Observation End Date/Time",
-  "OBR-16": "Ordering Provider",
-  "OBR-16.1": "ID Number",
-  "OBR-16.2": "Family Name",
-  "OBR-16.3": "Given Name",
-  "OBR-22": "Results Rpt/Status Chng - Date/Time",
-  "OBR-25": "Result Status",
+  "OBR.1": "Set ID - OBR",
+  "OBR.2": "Placer Order Number",
+  "OBR.3": "Filler Order Number",
+  "OBR.4": "Universal Service ID",
+  "OBR.4.1": "Identifier",
+  "OBR.4.2": "Text",
+  "OBR.4.3": "Name of Coding System",
+  "OBR.7": "Observation Date/Time",
+  "OBR.8": "Observation End Date/Time",
+  "OBR.16": "Ordering Provider",
+  "OBR.16.1": "ID Number",
+  "OBR.16.2": "Family Name",
+  "OBR.16.3": "Given Name",
+  "OBR.22": "Results Rpt/Status Chng - Date/Time",
+  "OBR.25": "Result Status",
 
-  "OBX-1": "Set ID - OBX",
-  "OBX-2": "Value Type",
-  "OBX-3": "Observation Identifier",
-  "OBX-3.1": "Identifier",
-  "OBX-3.2": "Text",
-  "OBX-3.3": "Name of Coding System",
-  "OBX-4": "Observation Sub-ID",
-  "OBX-5": "Observation Value",
-  "OBX-6": "Units",
-  "OBX-6.1": "Identifier",
-  "OBX-6.2": "Text",
-  "OBX-6.3": "Name of Coding System",
-  "OBX-7": "References Range",
-  "OBX-8": "Abnormal Flags",
-  "OBX-11": "Observation Result Status",
-  "OBX-14": "Date/Time of the Observation",
+  "OBX.1": "Set ID - OBX",
+  "OBX.2": "Value Type",
+  "OBX.3": "Observation Identifier",
+  "OBX.3.1": "Identifier",
+  "OBX.3.2": "Text",
+  "OBX.3.3": "Name of Coding System",
+  "OBX.4": "Observation Sub-ID",
+  "OBX.5": "Observation Value",
+  "OBX.6": "Units",
+  "OBX.6.1": "Identifier",
+  "OBX.6.2": "Text",
+  "OBX.6.3": "Name of Coding System",
+  "OBX.7": "References Range",
+  "OBX.8": "Abnormal Flags",
+  "OBX.11": "Observation Result Status",
+  "OBX.14": "Date/Time of the Observation",
 
-  "NTE-1": "Set ID - NTE",
-  "NTE-2": "Source of Comment",
-  "NTE-3": "Comment",
-  "NTE-4": "Comment Type",
+  "NTE.1": "Set ID - NTE",
+  "NTE.2": "Source of Comment",
+  "NTE.3": "Comment",
+  "NTE.4": "Comment Type",
 
-  "SPM-1": "Set ID - SPM",
-  "SPM-2": "Specimen ID",
-  "SPM-2.1": "Container Identifier",
-  "SPM-2.2": "Position in Container",
-  "SPM-3": "Specimen Parent IDs",
-  "SPM-4": "Specimen Type",
-  "SPM-4.1": "Identifier",
-  "SPM-4.2": "Text",
-  "SPM-4.3": "Name of Coding System",
-  "SPM-17": "Specimen Collection Date/Time",
-  "SPM-18": "Specimen Received Date/Time",
+  "SPM.1": "Set ID - SPM",
+  "SPM.2": "Specimen ID",
+  "SPM.2.1": "Container Identifier",
+  "SPM.2.2": "Position in Container",
+  "SPM.3": "Specimen Parent IDs",
+  "SPM.4": "Specimen Type",
+  "SPM.4.1": "Identifier",
+  "SPM.4.2": "Text",
+  "SPM.4.3": "Name of Coding System",
+  "SPM.17": "Specimen Collection Date/Time",
+  "SPM.18": "Specimen Received Date/Time",
 
-  "ORC-1": "Order Control",
-  "ORC-2": "Placer Order Number",
-  "ORC-3": "Filler Order Number",
-  "ORC-4": "Placer Group Number",
-  "ORC-5": "Order Status",
-  "ORC-9": "Date/Time of Transaction",
-  "ORC-12": "Ordering Provider",
-  "ORC-12.1": "ID Number",
-  "ORC-12.2": "Family Name",
-  "ORC-12.3": "Given Name",
+  "ORC.1": "Order Control",
+  "ORC.2": "Placer Order Number",
+  "ORC.3": "Filler Order Number",
+  "ORC.4": "Placer Group Number",
+  "ORC.5": "Order Status",
+  "ORC.9": "Date/Time of Transaction",
+  "ORC.12": "Ordering Provider",
+  "ORC.12.1": "ID Number",
+  "ORC.12.2": "Family Name",
+  "ORC.12.3": "Given Name",
 };
+
 // List all the segments in the ORU^R01 message in the HL7v2.5 format from the internet and put them in an array
 
 // Create a react component that will take in the oru message and display it in a content editable div
@@ -580,12 +573,13 @@ export function AppMain() {
 /**
  * Gets a value from an HL7 message based on a path
  * @param message The HL7 message
- * @param path The path in format "SEGMENT-FIELD[.COMPONENT]"
+ * @param path The path in format "SEGMENT.FIELD[.COMPONENT]"
  * @returns The value at the specified path
  */
 function getHL7Value(message: Hl7Message, path: string): string {
-  // Split the path into segment and field parts (e.g., "OBX-7" -> ["OBX", "7"])
-  const [segmentId, fieldPath] = path.split('-');
+  // Split the path into segment and field parts (e.g., "OBX.7" -> ["OBX", "7"])
+  const [segmentId, ...parts] = path.split('.');
+  const fieldPath = parts.join('.');
   
   // Get the segment
   const segment = message.getSegment(segmentId);
@@ -599,28 +593,30 @@ function getHL7Value(message: Hl7Message, path: string): string {
   }
 
   // Split field path for nested components (e.g., "5.1" -> ["5", "1"])
-  const [fieldIndex, ...componentIndices] = fieldPath.split('.');
+  const fieldParts = fieldPath.split('.');
+  const fieldIndex = Number.parseInt(fieldParts[0]);
   
   // Get the field
-  const field = segment.getField(Number.parseInt(fieldIndex));
+  const field = segment.getField(fieldIndex);
   if (!field) {
     return '';
   }
 
   // Get the component if specified
-  return componentIndices.length > 0 ? field.getComponent(Number.parseInt(componentIndices[0])) : field.toString();
+  return fieldParts.length > 1 ? field.getComponent(Number.parseInt(fieldParts[1])) : field.toString();
 }
 
 /**
  * Sets a value in an HL7 message string based on a path
  * @param hl7String The HL7 message as a string
- * @param path The path in format "SEGMENT-FIELD[.COMPONENT]"
+ * @param path The path in format "SEGMENT.FIELD[.COMPONENT]"
  * @param value The value to set
  * @returns The updated HL7 message string
  */
 function setHL7ValueInString(hl7String: string, path: string, value: string): string {
-  // Split the path into segment and field parts (e.g., "OBX-7" -> ["OBX", "7"])
-  const [segmentId, fieldPath] = path.split('-');
+  // Split the path into segment and field parts (e.g., "OBX.7" -> ["OBX", "7"])
+  const [segmentId, ...parts] = path.split('.');
+  const fieldPath = parts.join('.');
   
   // Split message into lines and find target segment
   const lines = hl7String.split('\\n').map(line => line.trim());
@@ -630,9 +626,9 @@ function setHL7ValueInString(hl7String: string, path: string, value: string): st
   }
 
   // Parse the field and component indices (1-based in HL7)
-  const [fieldStr, componentStr] = fieldPath.split('.');
-  const fieldIndex = Number.parseInt(fieldStr);
-  const componentIndex = componentStr ? Number.parseInt(componentStr) : null;
+  const fieldParts = fieldPath.split('.');
+  const fieldIndex = Number.parseInt(fieldParts[0]);
+  const componentIndex = fieldParts.length > 1 ? Number.parseInt(fieldParts[1]) : null;
   
   // Split the segment into fields (separator is |)
   const fields = lines[segmentIndex].split('|');
