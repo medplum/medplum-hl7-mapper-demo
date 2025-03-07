@@ -3,7 +3,7 @@ import { Hl7Message } from "@medplum/core";
 import { IconPlus, IconTrash, IconMenu2, IconMessage, IconCheck } from "@tabler/icons-react";
 import { diffChars } from "diff";
 import React, { useCallback, useState } from "react";
-import { Filter, FilterRow, Mapping, Transform, applyTransforms } from "./util/transform";
+import { Filter, FilterRow, Mapping, Transform, applyTransforms, getHL7Value } from "./util/transform";
 import { saveAs } from 'file-saver';
 
 // Define a type for our message templates
@@ -279,6 +279,7 @@ export function AppMain() {
   const [filters, setFilters] = useState<Filter[]>([INITIAL_FILTER]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedMessageIndex, setSelectedMessageIndex] = useState(0);
+  const [generatedBotCode, setGeneratedBotCode] = useState<string>('');
 
   // Function to select a message template
   const selectMessageTemplate = (index: number) => {
@@ -484,33 +485,262 @@ export function AppMain() {
     );
   };
 
-  const transform = useCallback(() => {
-    let message = Hl7Message.parse(input);
-    const transformedMessage = applyTransforms(message, filters);
-    setOutput(transformedMessage.toString());
-  }, [input, filters]);
-
-  const exportBot = () => {
-    // Create the bot.ts file content
-    const filtersJson = JSON.stringify(filters, null, 2);
-    
-    const fileContent = `import { Hl7Message, applyTransforms } from '@medplum/hl7';
-
-// Encoded filters from the UI
-const FILTERS = ${filtersJson};
+  // Generate the bot code as a string with unrolled logic
+  const generateBotCode = useCallback(() => {
+    const code = `import { Hl7Message } from '@medplum/core';
 
 /**
- * Transforms an HL7 message using the configured filters
+ * Gets a value from an HL7 message based on a path
+ * @param message The HL7 message
+ * @param path The path in format "SEGMENT-FIELD[.COMPONENT]"
+ * @returns The value at the specified path
+ */
+function getHL7Value(message: Hl7Message, path: string): string {
+  // Split the path into segment and field parts (e.g., "OBX-7" -> ["OBX", "7"])
+  const [segmentId, fieldPath] = path.split('-');
+  
+  // Get the segment
+  const segment = message.getSegment(segmentId);
+  if (!segment) {
+    return '';
+  }
+
+  // If no field specified, return the whole segment
+  if (!fieldPath) {
+    return segment.toString();
+  }
+
+  // Split field path for nested components (e.g., "5.1" -> ["5", "1"])
+  const [fieldIndex, ...componentIndices] = fieldPath.split('.');
+  
+  // Get the field
+  const field = segment.getField(Number.parseInt(fieldIndex));
+  if (!field) {
+    return '';
+  }
+
+  // Get the component if specified
+  return componentIndices.length > 0 ? field.getComponent(Number.parseInt(componentIndices[0])) : field.toString();
+}
+
+/**
+ * Sets a value in an HL7 message string based on a path
+ * @param hl7String The HL7 message as a string
+ * @param path The path in format "SEGMENT-FIELD[.COMPONENT]"
+ * @param value The value to set
+ * @returns The updated HL7 message string
+ */
+function setHL7ValueInString(hl7String: string, path: string, value: string): string {
+  // Split the path into segment and field parts (e.g., "OBX-7" -> ["OBX", "7"])
+  const [segmentId, fieldPath] = path.split('-');
+  
+  // Split message into lines and find target segment
+  const lines = hl7String.split('\\n').map(line => line.trim());
+  const segmentIndex = lines.findIndex(line => line.startsWith(\`\${segmentId}|\`));
+  if (segmentIndex === -1 || !fieldPath) {
+    return hl7String;
+  }
+
+  // Parse the field and component indices (1-based in HL7)
+  const [fieldStr, componentStr] = fieldPath.split('.');
+  const fieldIndex = Number.parseInt(fieldStr);
+  const componentIndex = componentStr ? Number.parseInt(componentStr) : null;
+  
+  // Split the segment into fields (separator is |)
+  const fields = lines[segmentIndex].split('|');
+  // MSH1 gets parsed out
+  if (segmentId === 'MSH') {
+    fields.splice(1, 0, '|');
+  }
+
+  if (componentIndex === null) {
+    // Setting entire field
+    fields[fieldIndex] = value;
+  } else {
+    // Setting specific component
+    const components = fields[fieldIndex].split('^');
+    
+    // Pad components array if needed (accounting for 1-based indexing)
+    while (components.length <= componentIndex) {
+      components.push('');
+    }
+    
+    components[componentIndex] = value;
+    fields[fieldIndex] = components.join('^');
+  }
+
+  if (segmentId === 'MSH') {
+    fields.splice(1, 1);
+  }
+  // Reconstruct the message
+  lines[segmentIndex] = fields.join('|');
+  return lines.join('\\n');
+}
+
+/**
+ * Transforms an HL7 message using explicit filter logic
  * @param input The input HL7 message
  * @returns The transformed HL7 message
  */
 export default function transform(input: Hl7Message): Hl7Message {
-  return applyTransforms(input, FILTERS);
-}
-`;
+  let result = input;
+  let messageString = result.toString();
+  
+${filters.map((filter, filterIndex) => {
+  return `  // Filter ${filterIndex + 1}: ${filter.src || 'No source specified'}
+  {
+    const srcValue = getHL7Value(result, "${filter.src}");
+    
+    // Evaluate filter conditions
+    const filterResult = ${filter.filterRows.map((row, rowIndex) => {
+      let condition = '';
+      
+      switch(row.command) {
+        case 'startsWith':
+          condition = `srcValue.startsWith("${row.value}")`;
+          break;
+        case 'contains':
+          condition = `srcValue.includes("${row.value}")`;
+          break;
+        case 'endsWith':
+          condition = `srcValue.endsWith("${row.value}")`;
+          break;
+        case 'exact':
+          condition = `srcValue === "${row.value}"`;
+          break;
+        default:
+          condition = 'false';
+      }
+      
+      if (rowIndex === 0) {
+        return condition;
+      } else {
+        return `${row.operator === 'AND' ? '&&' : '||'} ${condition}`;
+      }
+    }).join(' ')};
+    
+    // Apply mappings if filter conditions match
+    if (filterResult) {
+${filter.mappings.map((mapping, mappingIndex) => {
+  return `      // Mapping ${mappingIndex + 1}: ${mapping.src || 'No source'} -> ${mapping.dst || 'No destination'}
+      {
+        let currentValue = getHL7Value(result, "${mapping.src}");
+        
+${mapping.transforms.map((transform, transformIndex) => {
+  let transformCode = '';
+  
+  switch(transform.command) {
+    case 'replace':
+      const args = transform.args.split(' ');
+      if (args.length >= 2) {
+        transformCode = `currentValue = currentValue.replace("${args[0]}", "${args[1]}");`;
+      } else {
+        transformCode = `// Invalid replace arguments: ${transform.args}`;
+      }
+      break;
+    case 'addPrefix':
+      transformCode = `currentValue = "${transform.args}" + currentValue;`;
+      break;
+    case 'removePrefix':
+      transformCode = `if (currentValue.startsWith("${transform.args}")) {
+          currentValue = currentValue.substring(${transform.args.length});
+        }`;
+      break;
+    case 'addSuffix':
+      transformCode = `currentValue = currentValue + "${transform.args}";`;
+      break;
+    case 'removeSuffix':
+      transformCode = `if (currentValue.endsWith("${transform.args}")) {
+          currentValue = currentValue.substring(0, currentValue.length - ${transform.args.length});
+        }`;
+      break;
+    case 'passthrough':
+      transformCode = `// Passthrough - no change`;
+      break;
+    default:
+      transformCode = `// Unknown transform: ${transform.command}`;
+  }
+  
+  return `        // Transform ${transformIndex + 1}: ${transform.command}
+        ${transformCode}`;
+}).join('\n')}
+        
+        // Set the transformed value to the destination
+        messageString = setHL7ValueInString(messageString, "${mapping.dst}", currentValue);
+        result = Hl7Message.parse(messageString);
+      }`;
+}).join('\n')}
+    }
+  }`;
+}).join('\n\n')}
+  
+  return result;
+}`;
 
+    setGeneratedBotCode(code);
+    return code;
+  }, [filters]);
+
+  // Function to dynamically import a string as a module
+  const dynamicImport = useCallback(async (code: string) => {
+    // @ts-ignore This is usually there but we have a fallback
+    if (globalThis.URL.createObjectURL) {
+      const blob = new Blob([code], { type: 'text/javascript' });
+      const url = URL.createObjectURL(blob);
+      try {
+        const module = await import(/* @vite-ignore */ url);
+        return module;
+      } finally {
+        URL.revokeObjectURL(url); // Clean up the URL
+      }
+    }
+    
+    // Fallback to data URL if createObjectURL is not available
+    const base64Code = btoa(code);
+    const dataUrl = `data:text/javascript;base64,${base64Code}`;
+    return import(/* @vite-ignore */ dataUrl);
+  }, []);
+
+  const transform = useCallback(async () => {
+    try {
+      // First generate the bot code
+      const botCode = generateBotCode();
+      
+      // Parse the input message
+      const message = Hl7Message.parse(input);
+      
+      try {
+        // Try to dynamically import the generated code
+        const module = await dynamicImport(botCode);
+        
+        // Execute the transform function from the imported module
+        if (module.default) {
+          const transformedMessage = module.default(message);
+          setOutput(transformedMessage.toString());
+        } else {
+          throw new Error('Module does not have a default export');
+        }
+      } catch (importError) {
+        console.error('Error importing module:', importError);
+        
+        // Fallback to the original implementation
+        const transformedMessage = applyTransforms(message, filters);
+        setOutput(transformedMessage.toString());
+        console.warn('Using fallback transform method');
+      }
+    } catch (error: unknown) {
+      console.error('Error during transform:', error);
+      // Show error in output
+      setOutput(`Error during transform: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [input, filters, generateBotCode, dynamicImport]);
+
+  const exportBot = () => {
+    // Use the already generated bot code
+    const botCode = generatedBotCode || generateBotCode();
+    
     // Create a blob and save it
-    const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob([botCode], { type: 'text/plain;charset=utf-8' });
     saveAs(blob, 'bot.ts');
   };
 
