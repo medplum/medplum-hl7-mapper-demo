@@ -1,26 +1,61 @@
-import { ActionIcon, Button, Group, InputLabel, Select, Stack, Table, TextInput, Textarea } from "@mantine/core";
+import { ActionIcon, Button, Group, InputLabel, Select, Stack, Table, TextInput, Textarea, Drawer, List, ThemeIcon } from "@mantine/core";
 import { Hl7Message } from "@medplum/core";
-import { IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconMenu2, IconMessage, IconCheck } from "@tabler/icons-react";
 import { diffChars } from "diff";
 import React, { useCallback, useState } from "react";
 import { Filter, FilterRow, Mapping, Transform, applyTransforms } from "./util/transform";
 import { saveAs } from 'file-saver';
 
-const oru = Hl7Message.parse(`MSH|^~\\&|MESA_RPT_MGR|EAST_RADIOLOGY|iFW|XYZ|||ORU^R01|MESA3b|P|2.4||||||||
-    PID|||CR3^^^ADT1||CRTHREE^PAUL|||||||||||||PatientAcct||||||||||||
-    PV1||1|CE||||12345^SMITH^BARON^H|||||||||||
-    OBR|||||||20010501141500.0000||||||||||||||||||F||||||||||||||||||
-    OBX|1|HD|SR Instance UID||1.113654.1.2001.30.2.1||||||F||||||
-    OBX|2|TX|SR Text||Radiology Report History Cough Findings PA evaluation of the chest demonstrates the lungs to be expanded and clear.  Conclusions Normal PA chest x-ray.||||||F||||||
-`);
+// Define a type for our message templates
+interface MessageTemplate {
+  name: string;
+  input: string;
+  expected: string;
+}
 
-const oruExpected = Hl7Message.parse(`MSH|^~\\&|mesa_RPT_MGR|EAST_radiology|iFW|XYZ|||ORU^R01|MESA3b|P|2.4||||||||
+// Create a list of sample messages
+const messageTemplates: MessageTemplate[] = [
+  {
+    name: "ORU R01 - Radiology Report",
+    input: `MSH|^~\\&|MESA_RPT_MGR|EAST_RADIOLOGY|iFW|XYZ|||ORU^R01|MESA3b|P|2.4||||||||
     PID|||CR3^^^ADT1||CRTHREE^PAUL|||||||||||||PatientAcct||||||||||||
     PV1||1|CE||||12345^SMITH^BARON^H|||||||||||
     OBR|||||||20010501141500.0000||||||||||||||||||F||||||||||||||||||
     OBX|1|HD|SR Instance UID||1.113654.1.2001.30.2.1||||||F||||||
-    OBX|2|TX|SR Text||Radiology Report History Cough Findings PA evaluation of the chest demonstrates the lungs to be expanded and clear.  Conclusions Normal PA chest x-ray.||||||F||||||
-`);
+    OBX|2|TX|SR Text||Radiology Report History Cough Findings PA evaluation of the chest demonstrates the lungs to be expanded and clear.  Conclusions Normal PA chest x-ray.||||||F||||||`,
+    expected: `MSH|^~\\&|mesa_RPT_MGR|EAST_radiology|iFW|XYZ|||ORU^R01|MESA3b|P|2.4||||||||
+    PID|||CR3^^^ADT1||CRTHREE^PAUL|||||||||||||PatientAcct||||||||||||
+    PV1||1|CE||||12345^SMITH^BARON^H|||||||||||
+    OBR|||||||20010501141500.0000||||||||||||||||||F||||||||||||||||||
+    OBX|1|HD|SR Instance UID||1.113654.1.2001.30.2.1||||||F||||||
+    OBX|2|TX|SR Text||Radiology Report History Cough Findings PA evaluation of the chest demonstrates the lungs to be expanded and clear.  Conclusions Normal PA chest x-ray.||||||F||||||`
+  },
+  {
+    name: "ADT A01 - Patient Admission",
+    input: `MSH|^~\\&|MESA_ADT|EAST_HOSPITAL|RECEIVER|DEST|20230101120000||ADT^A01|MSG00001|P|2.5|||AL|NE|
+    EVN|A01|20230101120000|||
+    PID|1||10001^^^MRN||SMITH^JOHN||19800101|M|||123 MAIN ST^^ANYTOWN^CA^90210||555-555-5555||S||10001|123-45-6789||||
+    PV1|1|I|WEST^389^1|1|||12345^DOCTOR^ROBERT|67890^DOCTOR^JANE||MED||||1|A0|`,
+    expected: `MSH|^~\\&|mesa_ADT|EAST_hospital|RECEIVER|DEST|20230101120000||ADT^A01|MSG00001|P|2.5|||AL|NE|
+    EVN|A01|20230101120000|||
+    PID|1||10001^^^MRN||SMITH^JOHN||19800101|M|||123 MAIN ST^^ANYTOWN^CA^90210||555-555-5555||S||10001|123-45-6789||||
+    PV1|1|I|WEST^389^1|1|||12345^DOCTOR^ROBERT|67890^DOCTOR^JANE||MED||||1|A0|`
+  },
+  {
+    name: "ORM O01 - Order Message",
+    input: `MSH|^~\\&|MESA_ORM|EAST_CLINIC|RECEIVER|DEST|20230101120000||ORM^O01|MSG00001|P|2.5|||AL|NE|
+    PID|1||10001^^^MRN||SMITH^JOHN||19800101|M|||123 MAIN ST^^ANYTOWN^CA^90210||555-555-5555||S||10001|123-45-6789||||
+    ORC|NW|ORD123456|||||^^^20230101120000||||12345^DOCTOR^ROBERT|
+    OBR|1|ORD123456||76770^ULTRASOUND RETROPERITONEAL^CPT|R||20230101120000|||||||||12345^DOCTOR^ROBERT||||||||||`,
+    expected: `MSH|^~\\&|mesa_ORM|EAST_clinic|RECEIVER|DEST|20230101120000||ORM^O01|MSG00001|P|2.5|||AL|NE|
+    PID|1||10001^^^MRN||SMITH^JOHN||19800101|M|||123 MAIN ST^^ANYTOWN^CA^90210||555-555-5555||S||10001|123-45-6789||||
+    ORC|NW|ORD123456|||||^^^20230101120000||||12345^DOCTOR^ROBERT|
+    OBR|1|ORD123456||76770^ULTRASOUND RETROPERITONEAL^CPT|R||20230101120000|||||||||12345^DOCTOR^ROBERT||||||||||`
+  }
+];
+
+const oru = Hl7Message.parse(messageTemplates[0].input);
+const oruExpected = Hl7Message.parse(messageTemplates[0].expected);
 
 // TODO: Display each transform as a row
 // Each row has dropdowns for src, dst, command, and args are freetext fields
@@ -242,6 +277,16 @@ export function AppMain() {
   const [output, setOutput] = useState(oru.toString());
   const [expected, setExpected] = useState(oruExpected.toString());
   const [filters, setFilters] = useState<Filter[]>([INITIAL_FILTER]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selectedMessageIndex, setSelectedMessageIndex] = useState(0);
+
+  // Function to select a message template
+  const selectMessageTemplate = (index: number) => {
+    setInput(messageTemplates[index].input);
+    setExpected(messageTemplates[index].expected);
+    setSelectedMessageIndex(index);
+    setSidebarOpen(false); // Close sidebar after selection
+  };
 
   const addFilter = () => {
     setFilters((current) => [
@@ -471,7 +516,49 @@ export default function transform(input: Hl7Message): Hl7Message {
 
   return (
     <div style={{ height: "100vh" }}>
+      <Drawer
+        opened={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        title="Message Templates"
+        padding="md"
+        size="sm"
+      >
+        <List spacing="xs">
+          {messageTemplates.map((template, index) => (
+            <List.Item
+              key={index}
+              onClick={() => selectMessageTemplate(index)}
+              style={{ 
+                cursor: 'pointer', 
+                padding: '8px',
+                backgroundColor: selectedMessageIndex === index ? '#f0f0f0' : 'transparent',
+                borderRadius: '4px'
+              }}
+              icon={
+                <ThemeIcon color={selectedMessageIndex === index ? "blue" : "gray"} size={24} radius="xl">
+                  {selectedMessageIndex === index ? <IconCheck size={16} /> : <IconMessage size={16} />}
+                </ThemeIcon>
+              }
+            >
+              {template.name}
+            </List.Item>
+          ))}
+        </List>
+      </Drawer>
+
       <Stack gap="md">
+        <Group justify="space-between" mb="md">
+          <ActionIcon 
+            onClick={() => setSidebarOpen(true)}
+            size="lg"
+            variant="light"
+          >
+            <IconMenu2 />
+          </ActionIcon>
+          <InputLabel size="lg">HL7 Mapper</InputLabel>
+          <div></div> {/* Empty div for spacing */}
+        </Group>
+
         <Group grow>
           <Textarea
             autosize
