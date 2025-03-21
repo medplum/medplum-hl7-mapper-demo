@@ -62,7 +62,7 @@ The Medplum HL7v2 Mapper is a specialized web application designed to simplify t
 ## Getting Started
 
 1. Clone the repository
-2. Install dependencies with `npm install`
+2. Install dependencies with `npm ci`
 3. Start the development server with `npm run dev`
 4. Begin by selecting a template message or pasting your own HL7v2 message
 5. Define your expected output
