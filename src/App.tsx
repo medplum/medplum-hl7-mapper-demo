@@ -1,10 +1,24 @@
-import { ActionIcon, Button, Group, InputLabel, Select, Stack, Table, TextInput, Textarea, Drawer, List, ThemeIcon, Divider } from "@mantine/core";
-import { Hl7Message } from "@medplum/core";
-import { IconPlus, IconTrash, IconMenu2, IconMessage, IconCheck, IconDeviceFloppy } from "@tabler/icons-react";
-import { diffChars } from "diff";
-import React, { useCallback, useState, useEffect } from "react";
-import { Filter, FilterRow, Mapping, Transform, applyTransforms } from "./util/transform";
+import {
+  ActionIcon,
+  Button,
+  Divider,
+  Drawer,
+  Group,
+  InputLabel,
+  List,
+  Select,
+  Stack,
+  Table,
+  TextInput,
+  Textarea,
+  ThemeIcon,
+} from '@mantine/core';
+import { Hl7Message } from '@medplum/core';
+import { IconCheck, IconDeviceFloppy, IconMenu2, IconMessage, IconPlus, IconTrash } from '@tabler/icons-react';
+import { diffChars } from 'diff';
 import { saveAs } from 'file-saver';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Filter, FilterRow, Mapping, Transform, applyTransforms } from './util/transform';
 
 // Define a type for our message templates
 interface MessageTemplate {
@@ -16,42 +30,42 @@ interface MessageTemplate {
 // Create a list of default sample messages
 const DEFAULT_TEMPLATES: MessageTemplate[] = [
   {
-    name: "ORU R01 - Radiology Report",
+    name: 'ORU R01 - Radiology Report',
     input: `MSH|^~\\&|MESA_RPT_MGR|EAST_RADIOLOGY|iFW|XYZ|||ORU^R01|MESA3b|P|2.4||||||||
-    PID|||CR3^^^ADT1||CRTHREE^PAUL|||||||||||||PatientAcct||||||||||||
-    PV1||1|CE||||12345^SMITH^BARON^H|||||||||||
-    OBR|||||||20010501141500.0000||||||||||||||||||F||||||||||||||||||
-    OBX|1|HD|SR Instance UID||1.113654.1.2001.30.2.1||||||F||||||
-    OBX|2|TX|SR Text||Radiology Report History Cough Findings PA evaluation of the chest demonstrates the lungs to be expanded and clear.  Conclusions Normal PA chest x-ray.||||||F||||||`,
+PID|||CR3^^^ADT1||CRTHREE^PAUL|||||||||||||PatientAcct||||||||||||
+PV1||1|CE||||12345^SMITH^BARON^H|||||||||||
+OBR|||||||20010501141500.0000||||||||||||||||||F||||||||||||||||||
+OBX|1|HD|SR Instance UID||1.113654.1.2001.30.2.1||||||F||||||
+OBX|2|TX|SR Text||Radiology Report History Cough Findings PA evaluation of the chest demonstrates the lungs to be expanded and clear.  Conclusions Normal PA chest x-ray.||||||F||||||`,
     expected: `MSH|^~\\&|mesa_RPT_MGR|EAST_radiology|iFW|XYZ|||ORU^R01|MESA3b|P|2.4||||||||
 PID|||CR3^^^ADT1||CRTHREE^PAUL|||||||||||||PatientAcct||||||||||||
 PV1||1|CE||||12345^SMITH^BARON^H|||||||||||
 OBR|||||||20010501141500.0000||||||||||||||||||F||||||||||||||||||
 OBX|1|HD|SR Instance UID||1.113654.1.2001.30.2.1||||||F||||||
-    OBX|2|TX|SR Text||Radiology Report History Cough Findings PA evaluation of the chest demonstrates the lungs to be expanded and clear.  Conclusions Normal PA chest x-ray.||||||F||||||`
+OBX|2|TX|SR Text||Radiology Report History Cough Findings PA evaluation of the chest demonstrates the lungs to be expanded and clear.  Conclusions Normal PA chest x-ray.||||||F||||||`,
   },
   {
-    name: "ADT A01 - Patient Admission",
+    name: 'ADT A01 - Patient Admission',
     input: `MSH|^~\\&|MESA_ADT|EAST_HOSPITAL|RECEIVER|DEST|20230101120000||ADT^A01|MSG00001|P|2.5|||AL|NE|
-    EVN|A01|20230101120000|||
-    PID|1||10001^^^MRN||SMITH^JOHN||19800101|M|||123 MAIN ST^^ANYTOWN^CA^90210||555-555-5555||S||10001|123-45-6789||||
-    PV1|1|I|WEST^389^1|1|||12345^DOCTOR^ROBERT|67890^DOCTOR^JANE||MED||||1|A0|`,
+EVN|A01|20230101120000|||
+PID|1||10001^^^MRN||SMITH^JOHN||19800101|M|||123 MAIN ST^^ANYTOWN^CA^90210||555-555-5555||S||10001|123-45-6789||||
+PV1|1|I|WEST^389^1|1|||12345^DOCTOR^ROBERT|67890^DOCTOR^JANE||MED||||1|A0|`,
     expected: `MSH|^~\\&|mesa_ADT|EAST_hospital|RECEIVER|DEST|20230101120000||ADT^A01|MSG00001|P|2.5|||AL|NE|
-    EVN|A01|20230101120000|||
-    PID|1||10001^^^MRN||SMITH^JOHN||19800101|M|||123 MAIN ST^^ANYTOWN^CA^90210||555-555-5555||S||10001|123-45-6789||||
-    PV1|1|I|WEST^389^1|1|||12345^DOCTOR^ROBERT|67890^DOCTOR^JANE||MED||||1|A0|`
+EVN|A01|20230101120000|||
+PID|1||10001^^^MRN||SMITH^JOHN||19800101|M|||123 MAIN ST^^ANYTOWN^CA^90210||555-555-5555||S||10001|123-45-6789||||
+PV1|1|I|WEST^389^1|1|||12345^DOCTOR^ROBERT|67890^DOCTOR^JANE||MED||||1|A0|`,
   },
   {
-    name: "ORM O01 - Order Message",
+    name: 'ORM O01 - Order Message',
     input: `MSH|^~\\&|MESA_ORM|EAST_CLINIC|RECEIVER|DEST|20230101120000||ORM^O01|MSG00001|P|2.5|||AL|NE|
-    PID|1||10001^^^MRN||SMITH^JOHN||19800101|M|||123 MAIN ST^^ANYTOWN^CA^90210||555-555-5555||S||10001|123-45-6789||||
-    ORC|NW|ORD123456|||||^^^20230101120000||||12345^DOCTOR^ROBERT|
-    OBR|1|ORD123456||76770^ULTRASOUND RETROPERITONEAL^CPT|R||20230101120000|||||||||12345^DOCTOR^ROBERT||||||||||`,
+PID|1||10001^^^MRN||SMITH^JOHN||19800101|M|||123 MAIN ST^^ANYTOWN^CA^90210||555-555-5555||S||10001|123-45-6789||||
+ORC|NW|ORD123456|||||^^^20230101120000||||12345^DOCTOR^ROBERT|
+OBR|1|ORD123456||76770^ULTRASOUND RETROPERITONEAL^CPT|R||20230101120000|||||||||12345^DOCTOR^ROBERT||||||||||`,
     expected: `MSH|^~\\&|mesa_ORM|EAST_clinic|RECEIVER|DEST|20230101120000||ORM^O01|MSG00001|P|2.5|||AL|NE|
-    PID|1||10001^^^MRN||SMITH^JOHN||19800101|M|||123 MAIN ST^^ANYTOWN^CA^90210||555-555-5555||S||10001|123-45-6789||||
-    ORC|NW|ORD123456|||||^^^20230101120000||||12345^DOCTOR^ROBERT|
-    OBR|1|ORD123456||76770^ULTRASOUND RETROPERITONEAL^CPT|R||20230101120000|||||||||12345^DOCTOR^ROBERT||||||||||`
-  }
+PID|1||10001^^^MRN||SMITH^JOHN||19800101|M|||123 MAIN ST^^ANYTOWN^CA^90210||555-555-5555||S||10001|123-45-6789||||
+ORC|NW|ORD123456|||||^^^20230101120000||||12345^DOCTOR^ROBERT|
+OBR|1|ORD123456||76770^ULTRASOUND RETROPERITONEAL^CPT|R||20230101120000|||||||||12345^DOCTOR^ROBERT||||||||||`,
+  },
 ];
 
 // Local storage key
@@ -84,106 +98,106 @@ const oruExpected = Hl7Message.parse(DEFAULT_TEMPLATES[0].expected);
 
 // Update HL7_LABELS to use dot notation
 const HL7_LABELS = {
-  "MSH.1": "Field Separator",
-  "MSH.2": "Encoding Characters",
-  "MSH.3": "Sending Application",
-  "MSH.4": "Sending Facility",
-  "MSH.5": "Receiving Application",
-  "MSH.6": "Receiving Facility",
-  "MSH.7": "Date/Time of Message",
-  "MSH.9": "Message Type",
-  "MSH.9.1": "Message Code",
-  "MSH.9.2": "Trigger Event",
-  "MSH.9.3": "Message Structure",
-  "MSH.10": "Message Control ID",
-  "MSH.11": "Processing ID",
-  "MSH.12": "Version ID",
+  'MSH.1': 'Field Separator',
+  'MSH.2': 'Encoding Characters',
+  'MSH.3': 'Sending Application',
+  'MSH.4': 'Sending Facility',
+  'MSH.5': 'Receiving Application',
+  'MSH.6': 'Receiving Facility',
+  'MSH.7': 'Date/Time of Message',
+  'MSH.9': 'Message Type',
+  'MSH.9.1': 'Message Code',
+  'MSH.9.2': 'Trigger Event',
+  'MSH.9.3': 'Message Structure',
+  'MSH.10': 'Message Control ID',
+  'MSH.11': 'Processing ID',
+  'MSH.12': 'Version ID',
 
-  "PID.1": "Set ID - PID",
-  "PID.2": "Patient ID",
-  "PID.3": "Patient Identifier List",
-  "PID.3.1": "ID Number",
-  "PID.3.2": "Check Digit",
-  "PID.3.3": "Check Digit Scheme",
-  "PID.3.4": "Assigning Authority",
-  "PID.3.5": "Identifier Type Code",
-  "PID.4": "Alternate Patient ID",
-  "PID.5": "Patient Name",
-  "PID.5.1": "Family Name",
-  "PID.5.2": "Given Name",
-  "PID.5.3": "Middle Name",
-  "PID.5.4": "Suffix",
-  "PID.5.5": "Prefix",
-  "PID.7": "Date/Time of Birth",
-  "PID.8": "Administrative Sex",
-  "PID.11": "Patient Address",
-  "PID.11.1": "Street Address",
-  "PID.11.2": "Other Designation",
-  "PID.11.3": "City",
-  "PID.11.4": "State/Province",
-  "PID.11.5": "ZIP/Postal Code",
-  "PID.11.6": "Country",
+  'PID.1': 'Set ID - PID',
+  'PID.2': 'Patient ID',
+  'PID.3': 'Patient Identifier List',
+  'PID.3.1': 'ID Number',
+  'PID.3.2': 'Check Digit',
+  'PID.3.3': 'Check Digit Scheme',
+  'PID.3.4': 'Assigning Authority',
+  'PID.3.5': 'Identifier Type Code',
+  'PID.4': 'Alternate Patient ID',
+  'PID.5': 'Patient Name',
+  'PID.5.1': 'Family Name',
+  'PID.5.2': 'Given Name',
+  'PID.5.3': 'Middle Name',
+  'PID.5.4': 'Suffix',
+  'PID.5.5': 'Prefix',
+  'PID.7': 'Date/Time of Birth',
+  'PID.8': 'Administrative Sex',
+  'PID.11': 'Patient Address',
+  'PID.11.1': 'Street Address',
+  'PID.11.2': 'Other Designation',
+  'PID.11.3': 'City',
+  'PID.11.4': 'State/Province',
+  'PID.11.5': 'ZIP/Postal Code',
+  'PID.11.6': 'Country',
 
-  "OBR.1": "Set ID - OBR",
-  "OBR.2": "Placer Order Number",
-  "OBR.3": "Filler Order Number",
-  "OBR.4": "Universal Service ID",
-  "OBR.4.1": "Identifier",
-  "OBR.4.2": "Text",
-  "OBR.4.3": "Name of Coding System",
-  "OBR.7": "Observation Date/Time",
-  "OBR.8": "Observation End Date/Time",
-  "OBR.16": "Ordering Provider",
-  "OBR.16.1": "ID Number",
-  "OBR.16.2": "Family Name",
-  "OBR.16.3": "Given Name",
-  "OBR.22": "Results Rpt/Status Chng - Date/Time",
-  "OBR.25": "Result Status",
+  'OBR.1': 'Set ID - OBR',
+  'OBR.2': 'Placer Order Number',
+  'OBR.3': 'Filler Order Number',
+  'OBR.4': 'Universal Service ID',
+  'OBR.4.1': 'Identifier',
+  'OBR.4.2': 'Text',
+  'OBR.4.3': 'Name of Coding System',
+  'OBR.7': 'Observation Date/Time',
+  'OBR.8': 'Observation End Date/Time',
+  'OBR.16': 'Ordering Provider',
+  'OBR.16.1': 'ID Number',
+  'OBR.16.2': 'Family Name',
+  'OBR.16.3': 'Given Name',
+  'OBR.22': 'Results Rpt/Status Chng - Date/Time',
+  'OBR.25': 'Result Status',
 
-  "OBX.1": "Set ID - OBX",
-  "OBX.2": "Value Type",
-  "OBX.3": "Observation Identifier",
-  "OBX.3.1": "Identifier",
-  "OBX.3.2": "Text",
-  "OBX.3.3": "Name of Coding System",
-  "OBX.4": "Observation Sub-ID",
-  "OBX.5": "Observation Value",
-  "OBX.6": "Units",
-  "OBX.6.1": "Identifier",
-  "OBX.6.2": "Text",
-  "OBX.6.3": "Name of Coding System",
-  "OBX.7": "References Range",
-  "OBX.8": "Abnormal Flags",
-  "OBX.11": "Observation Result Status",
-  "OBX.14": "Date/Time of the Observation",
+  'OBX.1': 'Set ID - OBX',
+  'OBX.2': 'Value Type',
+  'OBX.3': 'Observation Identifier',
+  'OBX.3.1': 'Identifier',
+  'OBX.3.2': 'Text',
+  'OBX.3.3': 'Name of Coding System',
+  'OBX.4': 'Observation Sub-ID',
+  'OBX.5': 'Observation Value',
+  'OBX.6': 'Units',
+  'OBX.6.1': 'Identifier',
+  'OBX.6.2': 'Text',
+  'OBX.6.3': 'Name of Coding System',
+  'OBX.7': 'References Range',
+  'OBX.8': 'Abnormal Flags',
+  'OBX.11': 'Observation Result Status',
+  'OBX.14': 'Date/Time of the Observation',
 
-  "NTE.1": "Set ID - NTE",
-  "NTE.2": "Source of Comment",
-  "NTE.3": "Comment",
-  "NTE.4": "Comment Type",
+  'NTE.1': 'Set ID - NTE',
+  'NTE.2': 'Source of Comment',
+  'NTE.3': 'Comment',
+  'NTE.4': 'Comment Type',
 
-  "SPM.1": "Set ID - SPM",
-  "SPM.2": "Specimen ID",
-  "SPM.2.1": "Container Identifier",
-  "SPM.2.2": "Position in Container",
-  "SPM.3": "Specimen Parent IDs",
-  "SPM.4": "Specimen Type",
-  "SPM.4.1": "Identifier",
-  "SPM.4.2": "Text",
-  "SPM.4.3": "Name of Coding System",
-  "SPM.17": "Specimen Collection Date/Time",
-  "SPM.18": "Specimen Received Date/Time",
+  'SPM.1': 'Set ID - SPM',
+  'SPM.2': 'Specimen ID',
+  'SPM.2.1': 'Container Identifier',
+  'SPM.2.2': 'Position in Container',
+  'SPM.3': 'Specimen Parent IDs',
+  'SPM.4': 'Specimen Type',
+  'SPM.4.1': 'Identifier',
+  'SPM.4.2': 'Text',
+  'SPM.4.3': 'Name of Coding System',
+  'SPM.17': 'Specimen Collection Date/Time',
+  'SPM.18': 'Specimen Received Date/Time',
 
-  "ORC.1": "Order Control",
-  "ORC.2": "Placer Order Number",
-  "ORC.3": "Filler Order Number",
-  "ORC.4": "Placer Group Number",
-  "ORC.5": "Order Status",
-  "ORC.9": "Date/Time of Transaction",
-  "ORC.12": "Ordering Provider",
-  "ORC.12.1": "ID Number",
-  "ORC.12.2": "Family Name",
-  "ORC.12.3": "Given Name",
+  'ORC.1': 'Order Control',
+  'ORC.2': 'Placer Order Number',
+  'ORC.3': 'Filler Order Number',
+  'ORC.4': 'Placer Group Number',
+  'ORC.5': 'Order Status',
+  'ORC.9': 'Date/Time of Transaction',
+  'ORC.12': 'Ordering Provider',
+  'ORC.12.1': 'ID Number',
+  'ORC.12.2': 'Family Name',
+  'ORC.12.3': 'Given Name',
 };
 
 // List all the segments in the ORU^R01 message in the HL7v2.5 format from the internet and put them in an array
@@ -197,51 +211,51 @@ const HL7_LABELS = {
 // transform(input, transformChain, output)
 
 const INITIAL_TRANSFORM: Transform = {
-  id: "1",
-  command: "passthrough",
-  args: "",
+  id: '1',
+  command: 'passthrough',
+  args: '',
 };
 
 const INITIAL_MAPPING: Mapping = {
-  id: "1",
-  src: "",
-  dst: "",
+  id: '1',
+  src: '',
+  dst: '',
   transforms: [INITIAL_TRANSFORM],
 };
 
 const INITIAL_FILTER_ROW: FilterRow = {
-  id: "1",
-  operator: "AND",
-  command: "contains",
-  value: "",
+  id: '1',
+  operator: 'AND',
+  command: 'contains',
+  value: '',
 };
 
 const INITIAL_FILTER: Filter = {
-  id: "1",
-  src: "",
+  id: '1',
+  src: '',
   filterRows: [INITIAL_FILTER_ROW],
   mappings: [INITIAL_MAPPING],
 };
 
 const OPERATOR_OPTIONS = [
-  { value: "AND", label: "AND" },
-  { value: "OR", label: "OR" },
+  { value: 'AND', label: 'AND' },
+  { value: 'OR', label: 'OR' },
 ];
 
 const FILTER_FUNCTION_OPTIONS = [
-  { value: "startsWith", label: "Starts With" },
-  { value: "contains", label: "Contains" },
-  { value: "endsWith", label: "Ends With" },
-  { value: "exact", label: "Exact Match" },
+  { value: 'startsWith', label: 'Starts With' },
+  { value: 'contains', label: 'Contains' },
+  { value: 'endsWith', label: 'Ends With' },
+  { value: 'exact', label: 'Exact Match' },
 ];
 
 const TRANSFORM_FUNCTION_OPTIONS = [
-  { value: "replace", label: "Replace" },
-  { value: "passthrough", label: "Passthrough" },
-  { value: "addPrefix", label: "Add Prefix" },
-  { value: "removePrefix", label: "Remove Prefix" },
-  { value: "addSuffix", label: "Add Suffix" },
-  { value: "removeSuffix", label: "Remove Suffix" },
+  { value: 'replace', label: 'Replace' },
+  { value: 'passthrough', label: 'Passthrough' },
+  { value: 'addPrefix', label: 'Add Prefix' },
+  { value: 'removePrefix', label: 'Remove Prefix' },
+  { value: 'addSuffix', label: 'Add Suffix' },
+  { value: 'removeSuffix', label: 'Remove Suffix' },
   // Add more functions as needed
 ];
 
@@ -260,15 +274,15 @@ interface DiffStyles {
 
 const diffStyles: DiffStyles = {
   added: {
-    backgroundColor: "rgba(0, 255, 0, 0.2)",
-    color: "darkgreen",
+    backgroundColor: 'rgba(0, 255, 0, 0.2)',
+    color: 'darkgreen',
   },
   removed: {
-    backgroundColor: "rgba(255, 0, 0, 0.2)",
-    color: "darkred",
+    backgroundColor: 'rgba(255, 0, 0, 0.2)',
+    color: 'darkred',
   },
   unchanged: {
-    color: "inherit",
+    color: 'inherit',
   },
 };
 
@@ -277,7 +291,7 @@ function DiffView({ actual, expected }: { actual: string; expected: string }) {
   const diff = diffChars(expected, actual);
 
   return (
-    <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+    <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
       {diff.map((part, index) => {
         const style = part.added ? diffStyles.added : part.removed ? diffStyles.removed : diffStyles.unchanged;
         return (
@@ -297,7 +311,6 @@ export function App() {
   const [filters, setFilters] = useState<Filter[]>([INITIAL_FILTER]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedMessageIndex, setSelectedMessageIndex] = useState(0);
-  const [generatedBotCode, setGeneratedBotCode] = useState<string>('');
   const [newTemplateName, setNewTemplateName] = useState<string>('');
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
 
@@ -305,7 +318,7 @@ export function App() {
   useEffect(() => {
     const loadedTemplates = loadTemplatesFromStorage();
     setTemplates(loadedTemplates);
-    
+
     // Set initial input and expected from the first template
     if (loadedTemplates.length > 0) {
       setInput(loadedTemplates[0].input);
@@ -338,10 +351,10 @@ export function App() {
     const newTemplate: MessageTemplate = {
       name: newTemplateName.trim(),
       input: input,
-      expected: expected
+      expected: expected,
     };
 
-    setTemplates(prev => [...prev, newTemplate]);
+    setTemplates((prev) => [...prev, newTemplate]);
     setNewTemplateName(''); // Clear the input field
     setSidebarOpen(true); // Open the sidebar to show the new template
     setSelectedMessageIndex(templates.length); // Select the new template
@@ -350,14 +363,14 @@ export function App() {
   // Function to delete a template
   const deleteTemplate = (index: number, event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent triggering the selectMessageTemplate
-    
+
     if (window.confirm(`Are you sure you want to delete the template "${templates[index].name}"?`)) {
-      setTemplates(prev => {
+      setTemplates((prev) => {
         const newTemplates = [...prev];
         newTemplates.splice(index, 1);
         return newTemplates;
       });
-      
+
       // If we deleted the currently selected template, select the first one
       if (index === selectedMessageIndex) {
         if (templates.length > 1) {
@@ -670,166 +683,135 @@ export default function transform(input: Hl7Message): Hl7Message {
   let result = input;
   let messageString = result.toString();
   
-${filters.map((filter, filterIndex) => {
-  return `  // Filter ${filterIndex + 1}: ${filter.src || 'No source specified'}
+${filters
+  .map((filter, filterIndex) => {
+    return `  // Filter ${filterIndex + 1}: ${filter.src || 'No source specified'}
   {
     const srcValue = getHL7Value(result, "${filter.src}");
     
     // Evaluate filter conditions
-    const filterResult = ${filter.filterRows.map((row, rowIndex) => {
-      let condition = '';
-      
-      switch(row.command) {
-        case 'startsWith':
-          condition = `srcValue.startsWith("${row.value}")`;
-          break;
-        case 'contains':
-          condition = `srcValue.includes("${row.value}")`;
-          break;
-        case 'endsWith':
-          condition = `srcValue.endsWith("${row.value}")`;
-          break;
-        case 'exact':
-          condition = `srcValue === "${row.value}"`;
-          break;
-        default:
-          condition = 'false';
-      }
-      
-      if (rowIndex === 0) {
-        return condition;
-      } else {
+    const filterResult = ${filter.filterRows
+      .map((row, rowIndex) => {
+        let condition = '';
+
+        switch (row.command) {
+          case 'startsWith':
+            condition = `srcValue.startsWith("${row.value}")`;
+            break;
+          case 'contains':
+            condition = `srcValue.includes("${row.value}")`;
+            break;
+          case 'endsWith':
+            condition = `srcValue.endsWith("${row.value}")`;
+            break;
+          case 'exact':
+            condition = `srcValue === "${row.value}"`;
+            break;
+          default:
+            condition = 'false';
+        }
+
+        if (rowIndex === 0) {
+          return condition;
+        }
+
         return `${row.operator === 'AND' ? '&&' : '||'} ${condition}`;
-      }
-    }).join(' ')};
+      })
+      .join(' ')};
     
     // Apply mappings if filter conditions match
     if (filterResult) {
-${filter.mappings.map((mapping, mappingIndex) => {
-  return `      // Mapping ${mappingIndex + 1}: ${mapping.src || 'No source'} -> ${mapping.dst || 'No destination'}
+${filter.mappings
+  .map((mapping, mappingIndex) => {
+    return `      // Mapping ${mappingIndex + 1}: ${mapping.src || 'No source'} -> ${mapping.dst || 'No destination'}
       {
         let currentValue = getHL7Value(result, "${mapping.src}");
         
-${mapping.transforms.map((transform, transformIndex) => {
-  let transformCode = '';
-  
-  switch(transform.command) {
-    case 'replace':
-      const args = transform.args.split(' ');
-      if (args.length >= 2) {
-        transformCode = `currentValue = currentValue.replace("${args[0]}", "${args[1]}");`;
-      } else {
-        transformCode = `// Invalid replace arguments: ${transform.args}`;
+${mapping.transforms
+  .map((transform, transformIndex) => {
+    let transformCode = '';
+
+    switch (transform.command) {
+      case 'replace': {
+        const args = transform.args.split(' ');
+        if (args.length >= 2) {
+          transformCode = `currentValue = currentValue.replace("${args[0]}", "${args[1]}");`;
+        } else {
+          transformCode = `// Invalid replace arguments: ${transform.args}`;
+        }
+        break;
       }
-      break;
-    case 'addPrefix':
-      transformCode = `currentValue = "${transform.args}" + currentValue;`;
-      break;
-    case 'removePrefix':
-      transformCode = `if (currentValue.startsWith("${transform.args}")) {
+      case 'addPrefix':
+        transformCode = `currentValue = "${transform.args}" + currentValue;`;
+        break;
+      case 'removePrefix':
+        transformCode = `if (currentValue.startsWith("${transform.args}")) {
           currentValue = currentValue.substring(${transform.args.length});
         }`;
-      break;
-    case 'addSuffix':
-      transformCode = `currentValue = currentValue + "${transform.args}";`;
-      break;
-    case 'removeSuffix':
-      transformCode = `if (currentValue.endsWith("${transform.args}")) {
+        break;
+      case 'addSuffix':
+        transformCode = `currentValue = currentValue + "${transform.args}";`;
+        break;
+      case 'removeSuffix':
+        transformCode = `if (currentValue.endsWith("${transform.args}")) {
           currentValue = currentValue.substring(0, currentValue.length - ${transform.args.length});
         }`;
-      break;
-    case 'passthrough':
-      transformCode = `// Passthrough - no change`;
-      break;
-    default:
-      transformCode = `// Unknown transform: ${transform.command}`;
-  }
-  
-  return `        // Transform ${transformIndex + 1}: ${transform.command}
+        break;
+      case 'passthrough':
+        transformCode = '// Passthrough - no change';
+        break;
+      default:
+        transformCode = `// Unknown transform: ${transform.command}`;
+    }
+
+    return `        // Transform ${transformIndex + 1}: ${transform.command}
         ${transformCode}`;
-}).join('\n')}
+  })
+  .join('\n')}
         
         // Set the transformed value to the destination
         messageString = setHL7ValueInString(messageString, "${mapping.dst}", currentValue);
         result = Hl7Message.parse(messageString);
       }`;
-}).join('\n')}
+  })
+  .join('\n')}
     }
   }`;
-}).join('\n\n')}
+  })
+  .join('\n\n')}
   
   return result;
 }`;
 
-    setGeneratedBotCode(code);
     return code;
   }, [filters]);
 
-  // Function to dynamically import a string as a module
-  const dynamicImport = useCallback(async (code: string) => {
-    // @ts-ignore This is usually there but we have a fallback
-    if (globalThis.URL.createObjectURL) {
-      const blob = new Blob([code], { type: 'text/javascript' });
-      const url = URL.createObjectURL(blob);
-      try {
-        const module = await import(/* @vite-ignore */ url);
-        return module;
-      } finally {
-        URL.revokeObjectURL(url); // Clean up the URL
-      }
-    }
-    
-    // Fallback to data URL if createObjectURL is not available
-    const base64Code = btoa(code);
-    const dataUrl = `data:text/javascript;base64,${base64Code}`;
-    return import(/* @vite-ignore */ dataUrl);
-  }, []);
-
   const transform = useCallback(async () => {
     try {
-      // First generate the bot code
-      const botCode = generateBotCode();
-      
       // Parse the input message
       const message = Hl7Message.parse(input);
-      
-      try {
-        // Try to dynamically import the generated code
-        const module = await dynamicImport(botCode);
-        
-        // Execute the transform function from the imported module
-        if (module.default) {
-          const transformedMessage = module.default(message);
-          setOutput(transformedMessage.toString());
-        } else {
-          throw new Error('Module does not have a default export');
-        }
-      } catch (importError) {
-        console.error('Error importing module:', importError);
-        
-        // Fallback to the original implementation
-        const transformedMessage = applyTransforms(message, filters);
-        setOutput(transformedMessage.toString());
-        console.warn('Using fallback transform method');
-      }
+
+      // Fallback to the original implementation
+      const transformedMessage = applyTransforms(message, filters);
+      setOutput(transformedMessage.toString());
     } catch (error: unknown) {
       console.error('Error during transform:', error);
       // Show error in output
       setOutput(`Error during transform: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }, [input, filters, generateBotCode, dynamicImport]);
+  }, [input, filters]);
 
   const exportBot = () => {
     // Use the already generated bot code
-    const botCode = generatedBotCode || generateBotCode();
-    
+    const botCode = generateBotCode();
+
     // Create a blob and save it
     const blob = new Blob([botCode], { type: 'text/plain;charset=utf-8' });
     saveAs(blob, 'bot.ts');
   };
 
   return (
-    <div style={{ height: "100vh" }}>
+    <div style={{ height: '100vh' }}>
       <Drawer
         opened={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -842,14 +824,14 @@ ${mapping.transforms.map((transform, transformIndex) => {
             <List.Item
               key={index}
               onClick={() => selectMessageTemplate(index)}
-              style={{ 
-                cursor: 'pointer', 
+              style={{
+                cursor: 'pointer',
                 padding: '8px',
                 backgroundColor: selectedMessageIndex === index ? '#f0f0f0' : 'transparent',
-                borderRadius: '4px'
+                borderRadius: '4px',
               }}
               icon={
-                <ThemeIcon color={selectedMessageIndex === index ? "blue" : "gray"} size={24} radius="xl">
+                <ThemeIcon color={selectedMessageIndex === index ? 'blue' : 'gray'} size={24} radius="xl">
                   {selectedMessageIndex === index ? <IconCheck size={16} /> : <IconMessage size={16} />}
                 </ThemeIcon>
               }
@@ -858,12 +840,7 @@ ${mapping.transforms.map((transform, transformIndex) => {
                 <div>{template.name}</div>
                 {/* Don't allow deleting the default templates */}
                 {index >= DEFAULT_TEMPLATES.length && (
-                  <ActionIcon 
-                    color="red" 
-                    variant="subtle" 
-                    onClick={(e) => deleteTemplate(index, e)}
-                    size="sm"
-                  >
+                  <ActionIcon color="red" variant="subtle" onClick={(e) => deleteTemplate(index, e)} size="sm">
                     <IconTrash size={16} />
                   </ActionIcon>
                 )}
@@ -875,11 +852,7 @@ ${mapping.transforms.map((transform, transformIndex) => {
 
       <Stack gap="md">
         <Group justify="space-between" mb="md">
-          <ActionIcon 
-            onClick={() => setSidebarOpen(true)}
-            size="lg"
-            variant="light"
-          >
+          <ActionIcon onClick={() => setSidebarOpen(true)} size="lg" variant="light">
             <IconMenu2 />
           </ActionIcon>
           <InputLabel size="lg">HL7 Mapper</InputLabel>
@@ -896,11 +869,7 @@ ${mapping.transforms.map((transform, transformIndex) => {
                 onChange={(e) => setNewTemplateName(e.target.value)}
                 style={{ flex: 1 }}
               />
-              <Button 
-                onClick={saveTemplate}
-                leftSection={<IconDeviceFloppy size={16} />}
-                style={{ marginTop: 'auto' }}
-              >
+              <Button onClick={saveTemplate} leftSection={<IconDeviceFloppy size={16} />} style={{ marginTop: 'auto' }}>
                 Save
               </Button>
             </Group>
@@ -934,15 +903,15 @@ ${mapping.transforms.map((transform, transformIndex) => {
             <InputLabel>Diff (Expected vs Actual)</InputLabel>
             <div
               style={{
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-                padding: "8px",
-                maxHeight: "200px",
-                overflowY: "auto",
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                padding: '8px',
+                maxHeight: '200px',
+                overflowY: 'auto',
               }}
             >
               <DiffView actual={output} expected={expected} />
-          </div>
+            </div>
           </Stack>
         </Group>
 
@@ -955,12 +924,12 @@ ${mapping.transforms.map((transform, transformIndex) => {
               <Select
                 label="Source Field"
                 value={filter.src}
-                onChange={(value) => updateFilterSource(filter.id, value || "")}
+                onChange={(value) => updateFilterSource(filter.id, value || '')}
                 data={HL7_SELECT_DATA}
                 searchable
                 clearable
                 placeholder="Select source field"
-                style={{ width: "300px" }}
+                style={{ width: '300px' }}
               />
               <ActionIcon onClick={() => deleteFilter(filter.id)} color="red" variant="subtle">
                 <IconTrash size={16} />
@@ -984,21 +953,21 @@ ${mapping.transforms.map((transform, transformIndex) => {
                       <Table.Td>
                         <Select
                           value={filterRow.operator}
-                          onChange={(value) => updateFilterRow(filter.id, filterRow.id, "operator", value || "AND")}
+                          onChange={(value) => updateFilterRow(filter.id, filterRow.id, 'operator', value || 'AND')}
                           data={OPERATOR_OPTIONS}
                         />
                       </Table.Td>
                       <Table.Td>
                         <Select
                           value={filterRow.command}
-                          onChange={(value) => updateFilterRow(filter.id, filterRow.id, "command", value || "contains")}
+                          onChange={(value) => updateFilterRow(filter.id, filterRow.id, 'command', value || 'contains')}
                           data={FILTER_FUNCTION_OPTIONS}
                         />
                       </Table.Td>
                       <Table.Td>
                         <TextInput
                           value={filterRow.value}
-                          onChange={(e) => updateFilterRow(filter.id, filterRow.id, "value", e.target.value)}
+                          onChange={(e) => updateFilterRow(filter.id, filterRow.id, 'value', e.target.value)}
                           placeholder="Filter value..."
                         />
                       </Table.Td>
@@ -1044,7 +1013,7 @@ ${mapping.transforms.map((transform, transformIndex) => {
                       <Table.Td>
                         <Select
                           value={mapping.src}
-                          onChange={(value) => updateMapping(filter.id, mapping.id, "src", value || "")}
+                          onChange={(value) => updateMapping(filter.id, mapping.id, 'src', value || '')}
                           data={HL7_SELECT_DATA}
                           searchable
                           clearable
@@ -1054,7 +1023,7 @@ ${mapping.transforms.map((transform, transformIndex) => {
                       <Table.Td>
                         <Select
                           value={mapping.dst}
-                          onChange={(value) => updateMapping(filter.id, mapping.id, "dst", value || "")}
+                          onChange={(value) => updateMapping(filter.id, mapping.id, 'dst', value || '')}
                           data={HL7_SELECT_DATA}
                           searchable
                           clearable
@@ -1069,8 +1038,8 @@ ${mapping.transforms.map((transform, transformIndex) => {
                               filter.id,
                               mapping.id,
                               mapping.transforms[0].id,
-                              "command",
-                              value || "replace"
+                              'command',
+                              value || 'replace'
                             )
                           }
                           data={TRANSFORM_FUNCTION_OPTIONS}
@@ -1080,7 +1049,7 @@ ${mapping.transforms.map((transform, transformIndex) => {
                         <TextInput
                           value={mapping.transforms[0].args}
                           onChange={(e) =>
-                            updateTransform(filter.id, mapping.id, mapping.transforms[0].id, "args", e.target.value)
+                            updateTransform(filter.id, mapping.id, mapping.transforms[0].id, 'args', e.target.value)
                           }
                           placeholder="arg1 arg2"
                         />
@@ -1107,7 +1076,7 @@ ${mapping.transforms.map((transform, transformIndex) => {
                           <Select
                             value={transform.command}
                             onChange={(value) =>
-                              updateTransform(filter.id, mapping.id, transform.id, "command", value || "replace")
+                              updateTransform(filter.id, mapping.id, transform.id, 'command', value || 'replace')
                             }
                             data={TRANSFORM_FUNCTION_OPTIONS}
                           />
@@ -1116,7 +1085,7 @@ ${mapping.transforms.map((transform, transformIndex) => {
                           <TextInput
                             value={transform.args}
                             onChange={(e) =>
-                              updateTransform(filter.id, mapping.id, transform.id, "args", e.target.value)
+                              updateTransform(filter.id, mapping.id, transform.id, 'args', e.target.value)
                             }
                             placeholder="arg1 arg2"
                           />

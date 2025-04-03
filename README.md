@@ -28,6 +28,7 @@ The Medplum HL7v2 Mapper is a specialized web application designed to simplify t
 ### 2. Define Transformations
 
 - **Filters**: Create conditions that determine when transformations should be applied
+
   - Filter on any segment/field using dot notation (e.g., `MSH.3`, `PID.5.1`)
   - Combine multiple conditions with AND/OR operators
   - Use various matching functions: contains, startsWith, endsWith, exact

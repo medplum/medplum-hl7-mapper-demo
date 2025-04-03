@@ -1,4 +1,4 @@
-import type { Hl7Message, Hl7Segment } from "@medplum/core";
+import type { Hl7Message, Hl7Segment } from '@medplum/core';
 
 export function getAllSegmentsByName(message: Hl7Message): Record<string, Hl7Segment[]> {
   const segments = {} as Record<string, Hl7Segment[]>;

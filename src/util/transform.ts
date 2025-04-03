@@ -1,9 +1,15 @@
-import { Hl7Message } from "@medplum/core";
+import { Hl7Message } from '@medplum/core';
 
 // Types from AppMain.tsx
 export type OperatorType = 'AND' | 'OR';
 export type FilterFunctionType = 'startsWith' | 'contains' | 'endsWith' | 'exact';
-export type TransformFunctionType = 'replace' | 'passthrough' | 'addPrefix' | 'removePrefix' | 'addSuffix' | 'removeSuffix';
+export type TransformFunctionType =
+  | 'replace'
+  | 'passthrough'
+  | 'addPrefix'
+  | 'removePrefix'
+  | 'addSuffix'
+  | 'removeSuffix';
 
 export interface Transform {
   id: string;
@@ -42,7 +48,7 @@ export function getHL7Value(message: Hl7Message, path: string): string {
   // Split the path into segment and field parts (e.g., "OBX.7" -> ["OBX", "7"])
   const [segmentId, ...parts] = path.split('.');
   const fieldPath = parts.join('.');
-  
+
   // Get the segment
   const segment = message.getSegment(segmentId);
   if (!segment) {
@@ -56,8 +62,8 @@ export function getHL7Value(message: Hl7Message, path: string): string {
 
   // Split field path for nested components (e.g., "5.1" -> ["5", "1"])
   const fieldParts = fieldPath.split('.');
-  const fieldIndex = parseInt(fieldParts[0]);
-  
+  const fieldIndex = Number.parseInt(fieldParts[0]);
+
   // Get the field
   const field = segment.getField(fieldIndex);
   if (!field) {
@@ -65,7 +71,7 @@ export function getHL7Value(message: Hl7Message, path: string): string {
   }
 
   // Get the component if specified
-  return fieldParts.length > 1 ? field.getComponent(parseInt(fieldParts[1])) : field.toString();
+  return fieldParts.length > 1 ? field.getComponent(Number.parseInt(fieldParts[1])) : field.toString();
 }
 
 /**
@@ -79,21 +85,22 @@ export function setHL7ValueInString(hl7String: string, path: string, value: stri
   // Split the path into segment and field parts (e.g., "OBX.7" -> ["OBX", "7"])
   const [segmentId, ...parts] = path.split('.');
   const fieldPath = parts.join('.');
-  
+
   // Split message into lines and find target segment
-  const lines = hl7String.split('\n').map(line => line.trim());
-  const segmentIndex = lines.findIndex(line => line.startsWith(segmentId + '|'));
+
+  const lines = hl7String.split('\r').map((line) => line.trim());
+  const segmentIndex = lines.findIndex((line) => line.startsWith(segmentId + '|'));
   if (segmentIndex === -1 || !fieldPath) {
     return hl7String;
   }
 
   // Parse the field and component indices (1-based in HL7)
   const fieldParts = fieldPath.split('.');
-  const fieldIndex = parseInt(fieldParts[0]);
-  const componentIndex = fieldParts.length > 1 ? parseInt(fieldParts[1]) : null;
-  
+  const fieldIndex = Number.parseInt(fieldParts[0]);
+  const componentIndex = fieldParts.length > 1 ? Number.parseInt(fieldParts[1]) : null;
+
   // Split the segment into fields (separator is |)
-  let fields = lines[segmentIndex].split('|');
+  const fields = lines[segmentIndex].split('|');
   // MSH1 gets parsed out
   if (segmentId === 'MSH') {
     fields.splice(1, 0, '|');
@@ -104,13 +111,13 @@ export function setHL7ValueInString(hl7String: string, path: string, value: stri
     fields[fieldIndex] = value;
   } else {
     // Setting specific component
-    let components = fields[fieldIndex].split('^');
-    
+    const components = fields[fieldIndex].split('^');
+
     // Pad components array if needed (accounting for 1-based indexing)
     while (components.length <= componentIndex) {
       components.push('');
     }
-    
+
     components[componentIndex] = value;
     fields[fieldIndex] = components.join('^');
   }
@@ -120,7 +127,7 @@ export function setHL7ValueInString(hl7String: string, path: string, value: stri
   }
   // Reconstruct the message
   lines[segmentIndex] = fields.join('|');
-  return lines.join('\n');
+  return lines.join('\r');
 }
 
 /**
@@ -131,10 +138,10 @@ export function setHL7ValueInString(hl7String: string, path: string, value: stri
  */
 export function applyTransforms(message: Hl7Message, filters: Filter[]): Hl7Message {
   let result = message;
-  
+
   for (const filter of filters) {
     const srcValue = getHL7Value(result, filter.src);
-    
+
     // Evaluate all filter conditions together with their operators
     const filterMatches = (filterRow: FilterRow) => {
       const matches = (() => {
@@ -157,16 +164,16 @@ export function applyTransforms(message: Hl7Message, filters: Filter[]): Hl7Mess
     // Combine all conditions using their operators
     const filterResult = filter.filterRows.reduce((acc, filterRow, index) => {
       const { matches, operator } = filterMatches(filterRow);
-      
+
       if (index === 0) return matches;
-      return operator === 'AND' ? (acc && matches) : (acc || matches);
+      return operator === 'AND' ? acc && matches : acc || matches;
     }, false);
 
     // If filter conditions match, apply all mappings
     if (filterResult) {
       for (const mapping of filter.mappings) {
         let currentValue = getHL7Value(result, mapping.src);
-        
+
         // Apply each transform in sequence
         for (const transform of mapping.transforms) {
           switch (transform.command) {
@@ -203,14 +210,10 @@ export function applyTransforms(message: Hl7Message, filters: Filter[]): Hl7Mess
         }
 
         // Set final transformed value to destination
-        result = Hl7Message.parse(setHL7ValueInString(
-          result.toString(), 
-          mapping.dst, 
-          currentValue
-        ));
+        result = Hl7Message.parse(setHL7ValueInString(result.toString(), mapping.dst, currentValue));
       }
     }
   }
-  
+
   return result;
-} 
+}

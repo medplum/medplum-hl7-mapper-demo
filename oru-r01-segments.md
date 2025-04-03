@@ -1,7 +1,9 @@
 # ORU^R01 Message Structure and Components
 
 ## Message Header (MSH)
+
 Required segment containing routing and message type information.
+
 - MSH-1: Field Separator (Required)
 - MSH-2: Encoding Characters (Required)
 - MSH-3: Sending Application (Optional)
@@ -18,7 +20,9 @@ Required segment containing routing and message type information.
 - MSH-12: Version ID (Required)
 
 ## Patient Information (PID)
+
 Required segment containing patient demographic data.
+
 - PID-1: Set ID - PID (Optional)
 - PID-2: Patient ID (Deprecated)
 - PID-3: Patient Identifier List (Required)
@@ -45,7 +49,9 @@ Required segment containing patient demographic data.
   - PID-11.6: Country (Optional)
 
 ## Observation Request (OBR)
+
 Required segment containing order information.
+
 - OBR-1: Set ID - OBR (Required)
 - OBR-2: Placer Order Number (Optional)
 - OBR-3: Filler Order Number (Optional)
@@ -63,7 +69,9 @@ Required segment containing order information.
 - OBR-25: Result Status (Required)
 
 ## Observation/Result (OBX)
+
 Optional segment containing the actual results.
+
 - OBX-1: Set ID - OBX (Required)
 - OBX-2: Value Type (Required)
 - OBX-3: Observation Identifier (Required)
@@ -82,14 +90,18 @@ Optional segment containing the actual results.
 - OBX-14: Date/Time of the Observation (Optional)
 
 ## Notes and Comments (NTE)
+
 Optional segment for additional notes.
+
 - NTE-1: Set ID - NTE (Optional)
 - NTE-2: Source of Comment (Optional)
 - NTE-3: Comment (Optional)
 - NTE-4: Comment Type (Optional)
 
 ## Specimen Information (SPM)
+
 Optional segment containing specimen details.
+
 - SPM-1: Set ID - SPM (Optional)
 - SPM-2: Specimen ID (Optional)
   - SPM-2.1: Container Identifier (Optional)
@@ -103,7 +115,9 @@ Optional segment containing specimen details.
 - SPM-18: Specimen Received Date/Time (Optional)
 
 ## Common Order (ORC)
+
 Optional segment containing order control information.
+
 - ORC-1: Order Control (Required)
 - ORC-2: Placer Order Number (Optional)
 - ORC-3: Filler Order Number (Optional)
@@ -116,6 +130,7 @@ Optional segment containing order control information.
   - ORC-12.3: Given Name (Optional)
 
 ## Additional Notes:
+
 1. Components marked as "Required" must be present in the segment
 2. Components marked as "Optional" may be omitted based on implementation needs
 3. Some fields contain multiple components, separated by component separators (usually ^)
