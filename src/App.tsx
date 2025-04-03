@@ -838,12 +838,9 @@ ${mapping.transforms
             >
               <Group justify="space-between" style={{ width: '100%' }}>
                 <div>{template.name}</div>
-                {/* Don't allow deleting the default templates */}
-                {index >= DEFAULT_TEMPLATES.length && (
-                  <ActionIcon color="red" variant="subtle" onClick={(e) => deleteTemplate(index, e)} size="sm">
-                    <IconTrash size={16} />
-                  </ActionIcon>
-                )}
+                <ActionIcon color="red" variant="subtle" onClick={(e) => deleteTemplate(index, e)} size="sm">
+                  <IconTrash size={16} />
+                </ActionIcon>
               </Group>
             </List.Item>
           ))}
