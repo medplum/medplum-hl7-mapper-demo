@@ -288,7 +288,7 @@ const diffStyles: DiffStyles = {
 
 // Add this component for rendering diffs
 function DiffView({ actual, expected }: { actual: string; expected: string }) {
-  const diff = diffChars(expected, actual);
+  const diff = diffChars(actual, expected);
 
   return (
     <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
