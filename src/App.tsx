@@ -17,7 +17,7 @@ import { Hl7Message } from '@medplum/core';
 import { IconCheck, IconDeviceFloppy, IconMenu2, IconMessage, IconPlus, IconTrash } from '@tabler/icons-react';
 import { diffChars } from 'diff';
 import { saveAs } from 'file-saver';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Filter, FilterRow, Mapping, Transform, applyTransforms } from './util/transform';
 
 // Define a type for our message templates
@@ -364,6 +364,18 @@ export function App() {
   // Track if transform should run (when template is selected)
   const [shouldRunTransform, setShouldRunTransform] = useState(false);
 
+  const inputRef = useRef(input);
+  inputRef.current = input;
+
+  const expectedRef = useRef(expected);
+  expectedRef.current = expected;
+
+  const outputRef = useRef(output);
+  outputRef.current = output;
+
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+
   // Define transform function
   const transform = useCallback(async () => {
     try {
@@ -429,16 +441,19 @@ export function App() {
   }, [shouldRunTransform, transform]);
 
   // Function to select a message template
-  const selectMessageTemplate = (index: number) => {
-    setInput(templates[index].input);
-    setExpected(templates[index].expected);
-    setSelectedMessageIndex(index);
-    saveSelectedTemplateIndexToStorage(index);
-    setSidebarOpen(false); // Close sidebar after selection
-  };
+  const selectMessageTemplate = useCallback(
+    (index: number) => {
+      setInput(templates[index].input);
+      setExpected(templates[index].expected);
+      setSelectedMessageIndex(index);
+      saveSelectedTemplateIndexToStorage(index);
+      setSidebarOpen(false); // Close sidebar after selection
+    },
+    [templates]
+  );
 
   // Function to save current input/expected as a new template
-  const saveTemplate = () => {
+  const saveTemplate = useCallback(() => {
     if (!newTemplateName.trim()) {
       alert('Please enter a name for the template');
       return;
@@ -446,8 +461,8 @@ export function App() {
 
     const newTemplate: MessageTemplate = {
       name: newTemplateName.trim(),
-      input: input,
-      expected: expected,
+      input: inputRef.current,
+      expected: expectedRef.current,
     };
 
     setTemplates((prev) => [...prev, newTemplate]);
@@ -455,35 +470,38 @@ export function App() {
     setSidebarOpen(true); // Open the sidebar to show the new template
     setSelectedMessageIndex(templates.length); // Select the new template
     saveSelectedTemplateIndexToStorage(templates.length);
-  };
+  }, [newTemplateName, templates.length]);
 
   // Function to delete a template
-  const deleteTemplate = (index: number, event: React.MouseEvent) => {
-    event.stopPropagation(); // Prevent triggering the selectMessageTemplate
+  const deleteTemplate = useCallback(
+    (index: number, event: React.MouseEvent) => {
+      event.stopPropagation(); // Prevent triggering the selectMessageTemplate
 
-    if (window.confirm(`Are you sure you want to delete the template "${templates[index].name}"?`)) {
-      setTemplates((prev) => {
-        const newTemplates = [...prev];
-        newTemplates.splice(index, 1);
-        return newTemplates;
-      });
+      if (window.confirm(`Are you sure you want to delete the template "${templates[index].name}"?`)) {
+        setTemplates((prev) => {
+          const newTemplates = [...prev];
+          newTemplates.splice(index, 1);
+          return newTemplates;
+        });
 
-      // If we deleted the currently selected template, select the first one
-      if (index === selectedMessageIndex) {
-        if (templates.length > 1) {
-          const newIndex = 0;
-          selectMessageTemplate(newIndex);
+        // If we deleted the currently selected template, select the first one
+        if (index === selectedMessageIndex) {
+          if (templates.length > 1) {
+            const newIndex = 0;
+            selectMessageTemplate(newIndex);
+          }
+        } else if (index < selectedMessageIndex) {
+          // If we deleted a template before the selected one, adjust the index
+          const newIndex = selectedMessageIndex - 1;
+          setSelectedMessageIndex(newIndex);
+          saveSelectedTemplateIndexToStorage(newIndex);
         }
-      } else if (index < selectedMessageIndex) {
-        // If we deleted a template before the selected one, adjust the index
-        const newIndex = selectedMessageIndex - 1;
-        setSelectedMessageIndex(newIndex);
-        saveSelectedTemplateIndexToStorage(newIndex);
       }
-    }
-  };
+    },
+    [selectMessageTemplate, selectedMessageIndex, templates]
+  );
 
-  const addFilter = () => {
+  const addFilter = useCallback(() => {
     setFilters((current) => [
       ...current,
       {
@@ -491,17 +509,17 @@ export function App() {
         id: (current.length + 1).toString(),
       },
     ]);
-  };
+  }, []);
 
-  const deleteFilter = (filterId: string) => {
+  const deleteFilter = useCallback((filterId: string) => {
     setFilters((current) => current.filter((f) => f.id !== filterId));
-  };
+  }, []);
 
-  const updateFilterSource = (filterId: string, src: string) => {
+  const updateFilterSource = useCallback((filterId: string, src: string) => {
     setFilters((current) => current.map((filter) => (filter.id === filterId ? { ...filter, src } : filter)));
-  };
+  }, []);
 
-  const addFilterRow = (filterId: string) => {
+  const addFilterRow = useCallback((filterId: string) => {
     setFilters((current) =>
       current.map((filter) => {
         if (filter.id === filterId) {
@@ -519,9 +537,9 @@ export function App() {
         return filter;
       })
     );
-  };
+  }, []);
 
-  const updateFilterRow = (filterId: string, rowId: string, field: keyof FilterRow, value: string) => {
+  const updateFilterRow = useCallback((filterId: string, rowId: string, field: keyof FilterRow, value: string) => {
     setFilters((current) =>
       current.map((filter) => {
         if (filter.id === filterId) {
@@ -533,9 +551,9 @@ export function App() {
         return filter;
       })
     );
-  };
+  }, []);
 
-  const deleteFilterRow = (filterId: string, rowId: string) => {
+  const deleteFilterRow = useCallback((filterId: string, rowId: string) => {
     setFilters((current) =>
       current.map((filter) => {
         if (filter.id === filterId) {
@@ -547,9 +565,9 @@ export function App() {
         return filter;
       })
     );
-  };
+  }, []);
 
-  const addMapping = (filterId: string) => {
+  const addMapping = useCallback((filterId: string) => {
     setFilters((current) =>
       current.map((filter) => {
         if (filter.id === filterId) {
@@ -567,9 +585,9 @@ export function App() {
         return filter;
       })
     );
-  };
+  }, []);
 
-  const updateMapping = (filterId: string, mappingId: string, field: keyof Mapping, value: string) => {
+  const updateMapping = useCallback((filterId: string, mappingId: string, field: keyof Mapping, value: string) => {
     setFilters((current) =>
       current.map((filter) => {
         if (filter.id === filterId) {
@@ -583,9 +601,9 @@ export function App() {
         return filter;
       })
     );
-  };
+  }, []);
 
-  const addTransform = (filterId: string, mappingId: string) => {
+  const addTransform = useCallback((filterId: string, mappingId: string) => {
     setFilters((current) =>
       current.map((filter) => {
         if (filter.id === filterId) {
@@ -611,39 +629,36 @@ export function App() {
         return filter;
       })
     );
-  };
+  }, []);
 
-  const updateTransform = (
-    filterId: string,
-    mappingId: string,
-    transformId: string,
-    field: keyof Transform,
-    value: string
-  ) => {
-    setFilters((current) =>
-      current.map((filter) => {
-        if (filter.id === filterId) {
-          return {
-            ...filter,
-            mappings: filter.mappings.map((mapping) => {
-              if (mapping.id === mappingId) {
-                return {
-                  ...mapping,
-                  transforms: mapping.transforms.map((transform) =>
-                    transform.id === transformId ? { ...transform, [field]: value } : transform
-                  ),
-                };
-              }
-              return mapping;
-            }),
-          };
-        }
-        return filter;
-      })
-    );
-  };
+  const updateTransform = useCallback(
+    (filterId: string, mappingId: string, transformId: string, field: keyof Transform, value: string) => {
+      setFilters((current) =>
+        current.map((filter) => {
+          if (filter.id === filterId) {
+            return {
+              ...filter,
+              mappings: filter.mappings.map((mapping) => {
+                if (mapping.id === mappingId) {
+                  return {
+                    ...mapping,
+                    transforms: mapping.transforms.map((transform) =>
+                      transform.id === transformId ? { ...transform, [field]: value } : transform
+                    ),
+                  };
+                }
+                return mapping;
+              }),
+            };
+          }
+          return filter;
+        })
+      );
+    },
+    []
+  );
 
-  const deleteMapping = (filterId: string, mappingId: string) => {
+  const deleteMapping = useCallback((filterId: string, mappingId: string) => {
     setFilters((current) =>
       current.map((filter) => {
         if (filter.id === filterId) {
@@ -655,9 +670,9 @@ export function App() {
         return filter;
       })
     );
-  };
+  }, []);
 
-  const deleteTransform = (filterId: string, mappingId: string, transformId: string) => {
+  const deleteTransform = useCallback((filterId: string, mappingId: string, transformId: string) => {
     setFilters((current) =>
       current.map((filter) => {
         if (filter.id === filterId) {
@@ -677,7 +692,7 @@ export function App() {
         return filter;
       })
     );
-  };
+  }, []);
 
   // Generate the bot code as a string with unrolled logic
   const generateBotCode = useCallback(() => {
@@ -783,7 +798,7 @@ export default function transform(input: Hl7Message): Hl7Message {
   let result = input;
   let messageString = result.toString();
   
-${filters
+${filtersRef.current
   .map((filter, filterIndex) => {
     return `  // Filter ${filterIndex + 1}: ${filter.src || 'No source specified'}
   {
@@ -884,16 +899,16 @@ ${mapping.transforms
 }`;
 
     return code;
-  }, [filters]);
+  }, []);
 
-  const exportBot = () => {
+  const exportBot = useCallback(() => {
     // Use the already generated bot code
     const botCode = generateBotCode();
 
     // Create a blob and save it
     const blob = new Blob([botCode], { type: 'text/plain;charset=utf-8' });
     saveAs(blob, 'bot.ts');
-  };
+  }, [generateBotCode]);
 
   return (
     <div style={{ height: '100vh' }}>
