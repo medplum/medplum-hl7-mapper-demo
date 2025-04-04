@@ -71,6 +71,7 @@ OBR|1|ORD123456||76770^ULTRASOUND RETROPERITONEAL^CPT|R||20230101120000|||||||||
 // Local storage key
 const STORAGE_KEY = 'medplum:hl7Templates';
 const SELECTED_TEMPLATE_KEY = 'medplum:selectedTemplateIndex';
+const FILTERS_KEY = 'medplum:filters';
 
 // Helper function to load templates from localStorage
 const loadTemplatesFromStorage = (): MessageTemplate[] => {
@@ -113,6 +114,29 @@ const saveSelectedTemplateIndexToStorage = (index: number): void => {
     localStorage.setItem(SELECTED_TEMPLATE_KEY, index.toString());
   } catch (error) {
     console.error('Error saving selected template index to localStorage:', error);
+  }
+};
+
+// Helper function to load filters from localStorage
+const loadFiltersFromStorage = (): Filter[] => {
+  try {
+    const storedFilters = localStorage.getItem(FILTERS_KEY);
+    if (storedFilters) {
+      return JSON.parse(storedFilters);
+    }
+  } catch (error) {
+    console.error('Error loading filters from localStorage:', error);
+  }
+  return [INITIAL_FILTER]; // Default filter
+};
+
+// Helper function to save filters to localStorage
+const saveFiltersToStorage = (filters: Filter[]): void => {
+  try {
+    localStorage.setItem(FILTERS_KEY, JSON.stringify(filters));
+    console.log('saved', filters);
+  } catch (error) {
+    console.error('Error saving filters to localStorage:', error);
   }
 };
 
@@ -331,7 +355,8 @@ export function App() {
   const [input, setInput] = useState(oru.toString());
   const [output, setOutput] = useState(oru.toString());
   const [expected, setExpected] = useState(oruExpected.toString());
-  const [filters, setFilters] = useState<Filter[]>([INITIAL_FILTER]);
+  const [filters, setFilters] = useState<Filter[]>([]);
+  const [filtersLoaded, setFiltersLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedMessageIndex, setSelectedMessageIndex] = useState(0);
   const [newTemplateName, setNewTemplateName] = useState<string>('');
@@ -365,6 +390,11 @@ export function App() {
     const validIndex = savedIndex < loadedTemplates.length ? savedIndex : 0;
     setSelectedMessageIndex(validIndex);
 
+    // Load saved filters
+    const savedFilters = loadFiltersFromStorage();
+    setFilters(savedFilters);
+    setFiltersLoaded(true);
+
     // Set initial input and expected from the saved template
     if (loadedTemplates.length > 0) {
       setInput(loadedTemplates[validIndex].input);
@@ -379,6 +409,13 @@ export function App() {
       saveTemplatesToStorage(templates);
     }
   }, [templates]);
+
+  // Save filters to localStorage whenever they change
+  useEffect(() => {
+    if (filtersLoaded) {
+      saveFiltersToStorage(filters);
+    }
+  }, [filtersLoaded, filters]);
 
   // Run transform when a template is selected
   useEffect(() => {
@@ -961,7 +998,18 @@ ${mapping.transforms
 
         <Divider my="md" size="sm" />
 
-        <InputLabel size="sm">Filters</InputLabel>
+        <Group justify="space-between" align="center">
+          <InputLabel size="sm">Filters</InputLabel>
+          <Button
+            variant="subtle"
+            color="red"
+            size="xs"
+            leftSection={<IconTrash size={14} />}
+            onClick={() => setFilters([INITIAL_FILTER])}
+          >
+            Clear All
+          </Button>
+        </Group>
         {filters.map((filter) => (
           <Stack key={filter.id} gap="xs">
             <Group justify="space-between">
