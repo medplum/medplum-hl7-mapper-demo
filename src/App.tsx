@@ -399,7 +399,6 @@ export function App() {
     if (loadedTemplates.length > 0) {
       setInput(loadedTemplates[validIndex].input);
       setExpected(loadedTemplates[validIndex].expected);
-      setShouldRunTransform(true); // Run transform on initial load
     }
   }, []);
 
@@ -417,6 +416,10 @@ export function App() {
     }
   }, [filtersLoaded, filters]);
 
+  useEffect(() => {
+    setShouldRunTransform(true);
+  }, [input, expected, filters]);
+
   // Run transform when a template is selected
   useEffect(() => {
     if (shouldRunTransform) {
@@ -431,7 +434,6 @@ export function App() {
     setExpected(templates[index].expected);
     setSelectedMessageIndex(index);
     saveSelectedTemplateIndexToStorage(index);
-    setShouldRunTransform(true); // Trigger transform after template selection
     setSidebarOpen(false); // Close sidebar after selection
   };
 
@@ -453,7 +455,6 @@ export function App() {
     setSidebarOpen(true); // Open the sidebar to show the new template
     setSelectedMessageIndex(templates.length); // Select the new template
     saveSelectedTemplateIndexToStorage(templates.length);
-    setShouldRunTransform(true); // Trigger transform for the new template
   };
 
   // Function to delete a template
