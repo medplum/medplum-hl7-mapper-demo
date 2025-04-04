@@ -70,6 +70,7 @@ OBR|1|ORD123456||76770^ULTRASOUND RETROPERITONEAL^CPT|R||20230101120000|||||||||
 
 // Local storage key
 const STORAGE_KEY = 'medplum:hl7Templates';
+const SELECTED_TEMPLATE_KEY = 'medplum:selectedTemplateIndex';
 
 // Helper function to load templates from localStorage
 const loadTemplatesFromStorage = (): MessageTemplate[] => {
@@ -90,6 +91,28 @@ const saveTemplatesToStorage = (templates: MessageTemplate[]): void => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
   } catch (error) {
     console.error('Error saving templates to localStorage:', error);
+  }
+};
+
+// Helper function to load selected template index from localStorage
+const loadSelectedTemplateIndexFromStorage = (): number => {
+  try {
+    const storedIndex = localStorage.getItem(SELECTED_TEMPLATE_KEY);
+    if (storedIndex) {
+      return parseInt(storedIndex, 10);
+    }
+  } catch (error) {
+    console.error('Error loading selected template index from localStorage:', error);
+  }
+  return 0; // Default to first template
+};
+
+// Helper function to save selected template index to localStorage
+const saveSelectedTemplateIndexToStorage = (index: number): void => {
+  try {
+    localStorage.setItem(SELECTED_TEMPLATE_KEY, index.toString());
+  } catch (error) {
+    console.error('Error saving selected template index to localStorage:', error);
   }
 };
 
@@ -313,16 +336,40 @@ export function App() {
   const [selectedMessageIndex, setSelectedMessageIndex] = useState(0);
   const [newTemplateName, setNewTemplateName] = useState<string>('');
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
+  // Track if transform should run (when template is selected)
+  const [shouldRunTransform, setShouldRunTransform] = useState(false);
+
+  // Define transform function
+  const transform = useCallback(async () => {
+    try {
+      // Parse the input message
+      const message = Hl7Message.parse(input);
+
+      // Fallback to the original implementation
+      const transformedMessage = applyTransforms(message, filters);
+      setOutput(transformedMessage.toString());
+    } catch (error: unknown) {
+      console.error('Error during transform:', error);
+      // Show error in output
+      setOutput(`Error during transform: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [input, filters]);
 
   // Load templates from localStorage on component mount
   useEffect(() => {
     const loadedTemplates = loadTemplatesFromStorage();
     setTemplates(loadedTemplates);
 
-    // Set initial input and expected from the first template
+    // Load saved template index
+    const savedIndex = loadSelectedTemplateIndexFromStorage();
+    const validIndex = savedIndex < loadedTemplates.length ? savedIndex : 0;
+    setSelectedMessageIndex(validIndex);
+
+    // Set initial input and expected from the saved template
     if (loadedTemplates.length > 0) {
-      setInput(loadedTemplates[0].input);
-      setExpected(loadedTemplates[0].expected);
+      setInput(loadedTemplates[validIndex].input);
+      setExpected(loadedTemplates[validIndex].expected);
+      setShouldRunTransform(true); // Run transform on initial load
     }
   }, []);
 
@@ -333,11 +380,21 @@ export function App() {
     }
   }, [templates]);
 
+  // Run transform when a template is selected
+  useEffect(() => {
+    if (shouldRunTransform) {
+      transform();
+      setShouldRunTransform(false);
+    }
+  }, [shouldRunTransform, transform]);
+
   // Function to select a message template
   const selectMessageTemplate = (index: number) => {
     setInput(templates[index].input);
     setExpected(templates[index].expected);
     setSelectedMessageIndex(index);
+    saveSelectedTemplateIndexToStorage(index);
+    setShouldRunTransform(true); // Trigger transform after template selection
     setSidebarOpen(false); // Close sidebar after selection
   };
 
@@ -358,6 +415,8 @@ export function App() {
     setNewTemplateName(''); // Clear the input field
     setSidebarOpen(true); // Open the sidebar to show the new template
     setSelectedMessageIndex(templates.length); // Select the new template
+    saveSelectedTemplateIndexToStorage(templates.length);
+    setShouldRunTransform(true); // Trigger transform for the new template
   };
 
   // Function to delete a template
@@ -374,11 +433,14 @@ export function App() {
       // If we deleted the currently selected template, select the first one
       if (index === selectedMessageIndex) {
         if (templates.length > 1) {
-          selectMessageTemplate(0);
+          const newIndex = 0;
+          selectMessageTemplate(newIndex);
         }
       } else if (index < selectedMessageIndex) {
         // If we deleted a template before the selected one, adjust the index
-        setSelectedMessageIndex(selectedMessageIndex - 1);
+        const newIndex = selectedMessageIndex - 1;
+        setSelectedMessageIndex(newIndex);
+        saveSelectedTemplateIndexToStorage(newIndex);
       }
     }
   };
@@ -785,21 +847,6 @@ ${mapping.transforms
 
     return code;
   }, [filters]);
-
-  const transform = useCallback(async () => {
-    try {
-      // Parse the input message
-      const message = Hl7Message.parse(input);
-
-      // Fallback to the original implementation
-      const transformedMessage = applyTransforms(message, filters);
-      setOutput(transformedMessage.toString());
-    } catch (error: unknown) {
-      console.error('Error during transform:', error);
-      // Show error in output
-      setOutput(`Error during transform: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }, [input, filters]);
 
   const exportBot = () => {
     // Use the already generated bot code
